@@ -1,0 +1,1591 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Core & Ore: Infinite Deep</title>
+    <style>
+        /* Classic Web 1.0 / Wikipedia-inspired visual style */
+        body {
+            font-family: 'Times New Roman', Times, serif;
+            background-color: #ffffff;
+            color: #000000;
+            margin: 0;
+            padding: 15px;
+            line-height: 1.4;
+        }
+
+        h1, h2, h3, h4 {
+            font-family: "Linux Libertine", "Georgia", "Times", serif;
+            border-bottom: 1px solid #a2a9b1;
+            padding-bottom: 3px;
+            margin-top: 15px;
+            margin-bottom: 8px;
+            color: #000000;
+        }
+
+        h1 { font-size: 1.8em; }
+        h2 { font-size: 1.4em; }
+        h3 { font-size: 1.1em; border-bottom: none; margin-bottom: 4px; }
+
+        a, .tab-btn {
+            color: #0645ad;
+            text-decoration: underline;
+            cursor: pointer;
+        }
+
+        a:visited { color: #0b0080; }
+        a:hover, .tab-btn:hover { color: #0b0080; text-decoration: underline; }
+
+        /* Classic Wikipedia-style Navigation Bar */
+        .nav-bar {
+            background-color: #f8f9fa;
+            border: 1px solid #a2a9b1;
+            padding: 8px;
+            margin-bottom: 15px;
+            font-family: Arial, sans-serif;
+            font-size: 0.9em;
+        }
+
+        .tab-btn {
+            display: inline-block;
+            margin-right: 12px;
+            padding: 2px 6px;
+            background: none;
+            border: none;
+            font-size: 1em;
+        }
+
+        .tab-btn.active {
+            font-weight: bold;
+            color: #000000;
+            text-decoration: none;
+            border-bottom: 2px solid #000000;
+        }
+
+        /* Classic HTML Tables & Boxes */
+        table.wikitable {
+            background-color: #f8f9fa;
+            color: #222222;
+            margin: 10px 0;
+            border: 1px solid #a2a9b1;
+            border-collapse: collapse;
+            width: 100%;
+            font-family: Arial, sans-serif;
+            font-size: 0.9em;
+        }
+
+        table.wikitable th, table.wikitable td {
+            border: 1px solid #a2a9b1;
+            padding: 5px 8px;
+            text-align: left;
+        }
+
+        table.wikitable th {
+            background-color: #eaecf0;
+            text-align: left;
+        }
+
+        .infobox {
+            border: 1px solid #a2a9b1;
+            background-color: #f8f9fa;
+            padding: 10px;
+            margin-bottom: 15px;
+            font-family: Arial, sans-serif;
+            font-size: 0.9em;
+        }
+
+        /* Classic Form Elements */
+        button, input[type="button"], input[type="submit"] {
+            font-family: Arial, sans-serif;
+            font-size: 0.85em;
+            padding: 2px 8px;
+            background-color: #f8f9fa;
+            border: 1px solid #a2a9b1;
+            color: #000000;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #e0e0e0;
+            border-color: #72777d;
+        }
+
+        button:disabled {
+            color: #888888;
+            background-color: #f0f0f0;
+            border-color: #cccccc;
+            cursor: not-allowed;
+        }
+
+        input[type="text"] {
+            border: 1px solid #a2a9b1;
+            padding: 3px;
+            font-family: Arial, sans-serif;
+            font-size: 0.9em;
+        }
+
+        .hud-status {
+            font-family: monospace;
+            background: #ffffcc;
+            border: 1px solid #e6e600;
+            padding: 8px;
+            margin-bottom: 12px;
+            font-size: 0.95em;
+        }
+
+        .log-box {
+            background-color: #ffffff;
+            border: 1px solid #a2a9b1;
+            font-family: monospace;
+            font-size: 0.85em;
+            height: 100px;
+            overflow-y: auto;
+            padding: 5px;
+        }
+
+        /* Simple Modal */
+        .modal {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .modal-content {
+            background: #ffffff;
+            border: 2px solid #000000;
+            padding: 15px;
+            max-width: 450px;
+            width: 90%;
+            font-family: Arial, sans-serif;
+        }
+
+        .hidden { display: none !important; }
+
+        .progress-container {
+            width: 100%;
+            background-color: #e0e0e0;
+            border: 1px solid #72777d;
+            height: 12px;
+            margin-top: 4px;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background-color: #0645ad;
+            width: 0%;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- TITLE & HUD -->
+    <h1>Core & Ore: Infinite Deep</h1>
+    <div class="hud-status">
+        <strong>Funds:</strong> <span id="hud-cash">$0.00</span> | 
+        <strong>Depth:</strong> <span id="hud-depth">1m (Tier 1)</span> | 
+        <strong>Miners:</strong> <span id="hud-miners">1 / 1</span>
+        <span id="hud-prestige-container" class="hidden"> | <strong>Prestige AP:</strong> <span id="hud-prestige">0 AP</span></span>
+        <div style="float: right;">
+            [<a id="btn-save" href="javascript:void(0)">Save Game</a>] 
+            [<a id="btn-settings" href="javascript:void(0)">Settings</a>]
+        </div>
+    </div>
+
+    <!-- MAIN NAVIGATION TABS -->
+    <div class="nav-bar">
+        <strong>Navigation:</strong>
+        <span data-tab="tab-rig" class="tab-btn active">Mining Rig</span> |
+        <span data-tab="tab-inventory" class="tab-btn">Inventory & Market</span> |
+        <span data-tab="tab-upgrades" class="tab-btn">Upgrades</span> |
+        <span data-tab="tab-depth" class="tab-btn">Depth Strata</span> |
+        <span data-tab="tab-prestige" class="tab-btn">Ascension</span> |
+        <span data-tab="tab-stats" class="tab-btn">Statistics & Codex</span>
+    </div>
+
+    <!-- MAIN CONTENT AREA -->
+    <div id="main-content">
+
+        <!-- TAB 1: MINING RIG -->
+        <div id="tab-rig" class="tab-content">
+            <h2>Auto-Miner Excavation Deck</h2>
+            
+            <div class="infobox">
+                <h3>Manual Drill Control</h3>
+                <p>Click below to force an immediate manual break on the rock target:</p>
+                <button id="btn-manual-mine"><b>[ EXCAVATE ROCK NOW ]</b></button>
+            </div>
+
+            <table class="wikitable">
+                <tr>
+                    <th colspan="2">Mining Performance Summary</th>
+                </tr>
+                <tr>
+                    <td>Total Active Miners:</td>
+                    <td><span id="rig-stat-count">1</span></td>
+                </tr>
+                <tr>
+                    <td>Cycle Time per Mine:</td>
+                    <td><span id="rig-stat-speed">5.00s</span></td>
+                </tr>
+                <tr>
+                    <td>Multi-Ore Spawn Chance:</td>
+                    <td><span id="rig-stat-multi">0%</span></td>
+                </tr>
+                <tr>
+                    <td>Luck Rarity Multiplier:</td>
+                    <td><span id="rig-stat-luck">1.00x</span></td>
+                </tr>
+            </table>
+
+            <h3>Active Mining Nodes (<span id="rig-slots-label">1 / 1</span>)</h3>
+            <div id="miners-grid">
+                <!-- Dynamic miners list -->
+            </div>
+
+            <h3>Recent Excavation Activity Log</h3>
+            <div id="drop-log" class="log-box">
+                <div>> Automated rig initialized. Ready for operations.</div>
+            </div>
+        </div>
+
+        <!-- TAB 2: INVENTORY & MARKET -->
+        <div id="tab-inventory" class="tab-content hidden">
+            <h2>Ore Inventory & Market Trade Index</h2>
+
+            <div class="infobox">
+                <strong>Current Market Multiplier:</strong> <span id="market-multiplier-text">1.10x</span> (<span id="market-trend-badge">STABLE</span>)
+                <br><br>
+                <label>
+                    <input type="checkbox" id="toggle-autosell"> Enable Automated Continuous Liquidation (Auto-Seller)
+                </label>
+                <br><br>
+                <button id="btn-sell-all"><b>Sell All Inventory Items Now</b></button>
+            </div>
+
+            <div class="infobox" style="background-color: #ffffee; border-color: #cccc99;">
+                <h3>Active Buyer Contract</h3>
+                <div id="contract-details">
+                    <div><strong id="contract-target">Target: 50x Iron Vein</strong></div>
+                    <div>Bonus Payout Rate: <span id="contract-reward">+150% Value</span></div>
+                    <div>Contract Expiry Timer: <span id="contract-timer">00:45</span></div>
+                </div>
+                <br>
+                <button id="btn-fulfill-contract"><b>Fulfill Buyer Contract</b></button>
+            </div>
+
+            <h3>Vault Inventory (<span id="inventory-capacity-text">Total Items Stored: 0</span>)</h3>
+            <p>
+                Search Filter: <input type="text" id="inventory-search" placeholder="Type ore name..."> 
+                <button id="btn-filter-owned">Toggle Owned Only</button>
+            </p>
+
+            <table class="wikitable" id="inventory-table">
+                <thead>
+                    <tr>
+                        <th>Tier</th>
+                        <th>Item Name</th>
+                        <th>Owned Quantity</th>
+                        <th>Unit Sell Value</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="ore-inventory-grid">
+                    <!-- JS populated ore items -->
+                </tbody>
+            </table>
+        </div>
+
+        <!-- TAB 3: UPGRADES -->
+        <div id="tab-upgrades" class="tab-content hidden">
+            <h2>Rig & Operational Upgrades</h2>
+
+            <div class="nav-bar">
+                <strong>Category:</strong>
+                <span data-upgrade-cat="mining" class="upg-cat-btn tab-btn active">Mining Efficiency</span> |
+                <span data-upgrade-cat="luck" class="upg-cat-btn tab-btn">Luck & Quality</span> |
+                <span data-upgrade-cat="market" class="upg-cat-btn tab-btn">Market & Negotiation</span> |
+                <span data-upgrade-cat="automation" class="upg-cat-btn tab-btn">Automation Systems</span>
+            </div>
+
+            <div id="upgrades-grid">
+                <!-- JS populated upgrades list -->
+            </div>
+        </div>
+
+        <!-- TAB 4: DEPTH STRATA -->
+        <div id="tab-depth" class="tab-content hidden">
+            <h2>Geological Depth Strata</h2>
+
+            <div class="infobox">
+                <h3 id="depth-tier-indicator">Tier 1: Surface Layer</h3>
+                <p><strong id="depth-current-name">Current Depth: 1 Meter</strong></p>
+                <p>Drilling deeper into the Earth unlocks rarer core strata, brand-new mineral veins with higher values, and higher miner slot capacity.</p>
+                <hr>
+                <p>Next Target Depth: <strong id="depth-next-target">100 Meters</strong></p>
+                <button id="btn-drill-deeper"><b>Drill Deeper (<span id="depth-cost-text">$500</span>)</b></button>
+            </div>
+
+            <h3>Core Depth Strata Codex</h3>
+            <div id="tier-strata-list">
+                <!-- JS renders strata levels -->
+            </div>
+        </div>
+
+        <!-- TAB 5: ASCENSION -->
+        <div id="tab-prestige" class="tab-content hidden">
+            <h2>Quantum Core Ascension</h2>
+
+            <div class="infobox" style="background-color: #f0f0ff; border-color: #a0a0d0;">
+                <h3>Facility Reset Protocol</h3>
+                <p>Collapse your active facility to extract <strong>Ascension Tokens (AP)</strong>. Resetting clears Cash, Miners, and Standard Upgrades, but permanently grants massive global multipliers and enables transcendent perks.</p>
+                <p>Pending Ascension Tokens on Reset: <strong id="prestige-pending-tokens">0 AP</strong></p>
+                <button id="btn-do-prestige"><b>[ ASCEND FACILITY NOW ]</b></button>
+            </div>
+
+            <h3>Transcendent Ascension Perks</h3>
+            <div id="prestige-perks-grid">
+                <!-- JS populates ascension upgrades -->
+            </div>
+        </div>
+
+        <!-- TAB 6: STATS & CODEX -->
+        <div id="tab-stats" class="tab-content hidden">
+            <h2>Lifetime Facility Statistics</h2>
+
+            <table class="wikitable">
+                <tr>
+                    <th>Stat Metric</th>
+                    <th>Value</th>
+                </tr>
+                <tr>
+                    <td>All-Time Earnings:</td>
+                    <td><span id="stat-total-cash">$0.00</span></td>
+                </tr>
+                <tr>
+                    <td>Total Rocks Excavated:</td>
+                    <td><span id="stat-total-rocks">0</span></td>
+                </tr>
+                <tr>
+                    <td>Total Ores Liquidated:</td>
+                    <td><span id="stat-total-ores">0</span></td>
+                </tr>
+            </table>
+
+            <h3>Master Ore Compendium</h3>
+            <div id="stats-ore-codex">
+                <!-- JS renders codex elements -->
+            </div>
+        </div>
+
+    </div>
+
+    <!-- SETTINGS MODAL -->
+    <div id="modal-settings" class="modal hidden">
+        <div class="modal-content">
+            <h3>Facility Settings & Save Management</h3>
+            <p>Game progress auto-saves locally every 15 seconds.</p>
+            <hr>
+            <p>
+                <button id="btn-manual-save">Save Game State</button><br><br>
+                <button id="btn-export-save">Export Save Code</button><br><br>
+                <button id="btn-import-save">Import Save Code</button><br><br>
+                <button id="btn-hard-reset" style="color: red;">[ HARD RESET SAVE DATA ]</button>
+            </p>
+            <hr>
+            <div style="text-align: right;">
+                <button id="btn-close-settings">Close Window</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- OFFLINE PROGRESS MODAL -->
+    <div id="modal-offline" class="modal hidden">
+        <div class="modal-content">
+            <h3>Offline Mining Summary</h3>
+            <p id="offline-time-text">Your automated rig operated while you were away.</p>
+            <table class="wikitable">
+                <tr>
+                    <td>Rocks Mined:</td>
+                    <td><strong id="offline-rocks-count">0</strong></td>
+                </tr>
+                <tr>
+                    <td>Revenue Generated:</td>
+                    <td><strong id="offline-cash-earned">$0.00</strong></td>
+                </tr>
+            </table>
+            <div style="text-align: center;">
+                <button id="btn-claim-offline"><b>Collect Earnings</b></button>
+            </div>
+        </div>
+    </div>
+
+    <!-- GAME LOGIC SCRIPT -->
+    <script>
+        /* --- MASSIVE ORE & DEPTH DATA STRUCTS (12 DEPTH TIERS, 120+ UNIQUE ORES) --- */
+        const ORE_TIERS = [
+            {
+                tier: 1,
+                name: "Surface Layer",
+                depthMeters: 1,
+                costToUnlock: 0,
+                color: "#94a3b8",
+                ores: [
+                    { id: "stone", name: "Crude Stone", value: 1, weight: 60, icon: "fa-gem", color: "#94a3b8" },
+                    { id: "coal", name: "Coal Chunk", value: 3, weight: 25, icon: "fa-cubes-stacked", color: "#475569" },
+                    { id: "copper", name: "Copper Ore", value: 8, weight: 10, icon: "fa-coins", color: "#b45309" },
+                    { id: "iron", name: "Iron Vein", value: 20, weight: 4, icon: "fa-magnet", color: "#cbd5e1" },
+                    { id: "quartz", name: "Quartz Crystal", value: 50, weight: 1, icon: "fa-diamond", color: "#e2e8f0" }
+                ]
+            },
+            {
+                tier: 2,
+                name: "Shallow Crust",
+                depthMeters: 100,
+                costToUnlock: 500,
+                color: "#60a5fa",
+                ores: [
+                    { id: "silver", name: "Silver Chunk", value: 120, weight: 50, icon: "fa-coins", color: "#e2e8f0" },
+                    { id: "gold", name: "Gold Nugget", value: 300, weight: 30, icon: "fa-coins", color: "#fbbf24" },
+                    { id: "amber", name: "Fossilized Amber", value: 750, weight: 14, icon: "fa-sun", color: "#f59e0b" },
+                    { id: "platinum", name: "Platinum Ore", value: 1800, weight: 5, icon: "fa-ring", color: "#38bdf8" },
+                    { id: "emerald", name: "Raw Emerald", value: 5000, weight: 1, icon: "fa-gem", color: "#10b981" }
+                ]
+            },
+            {
+                tier: 3,
+                name: "Deep Lithosphere",
+                depthMeters: 500,
+                costToUnlock: 25000,
+                color: "#34d399",
+                ores: [
+                    { id: "ruby", name: "Blood Ruby", value: 12000, weight: 45, icon: "fa-gem", color: "#f43f5e" },
+                    { id: "sapphire", name: "Deep Sapphire", value: 30000, weight: 30, icon: "fa-gem", color: "#3b82f6" },
+                    { id: "titanium", name: "Titanium Ingot", value: 80000, weight: 15, icon: "fa-shield-halved", color: "#64748b" },
+                    { id: "obsidian", name: "Dark Obsidian", value: 200000, weight: 8, icon: "fa-square", color: "#1e293b" },
+                    { id: "diamond", name: "Flawless Diamond", value: 600000, weight: 2, icon: "fa-diamond", color: "#38bdf8" }
+                ]
+            },
+            {
+                tier: 4,
+                name: "Mantle Boundary",
+                depthMeters: 2500,
+                costToUnlock: 2500000,
+                color: "#f59e0b",
+                ores: [
+                    { id: "mythril", name: "Mythril Shard", value: 1500000, weight: 45, icon: "fa-meteor", color: "#a7f3d0" },
+                    { id: "adamantite", name: "Adamantite Ore", value: 4000000, weight: 30, icon: "fa-cube", color: "#f43f5e" },
+                    { id: "cobalt", name: "Cobalt Crystal", value: 10000000, weight: 15, icon: "fa-gem", color: "#2563eb" },
+                    { id: "orichalcum", name: "Orichalcum Matrix", value: 30000000, weight: 8, icon: "fa-atom", color: "#ea580c" },
+                    { id: "luminite", name: "Luminite Fragment", value: 100000000, weight: 2, icon: "fa-lightbulb", color: "#fef08a" }
+                ]
+            },
+            {
+                tier: 5,
+                name: "Molten Core",
+                depthMeters: 10000,
+                costToUnlock: 500000000,
+                color: "#ef4444",
+                ores: [
+                    { id: "pyroclast", name: "Pyroclast Resin", value: 250000000, weight: 45, icon: "fa-fire", color: "#ef4444" },
+                    { id: "magma_heart", name: "Magma Heart", value: 750000000, weight: 30, icon: "fa-heart", color: "#dc2626" },
+                    { id: "infernal_shard", name: "Infernal Shard", value: 2000000000, weight: 15, icon: "fa-volcano", color: "#b91c1c" },
+                    { id: "core_element", name: "Core Element", value: 6000000000, weight: 8, icon: "fa-sun", color: "#f97316" },
+                    { id: "solarium", name: "Solarium Ore", value: 20000000000, weight: 2, icon: "fa-star", color: "#eab308" }
+                ]
+            },
+            {
+                tier: 6,
+                name: "Abyssal Crust",
+                depthMeters: 50000,
+                costToUnlock: 100000000000,
+                color: "#8b5cf6",
+                ores: [
+                    { id: "void_dust", name: "Void Dust", value: 50000000000, weight: 45, icon: "fa-dust", color: "#8b5cf6" },
+                    { id: "abyssal_slate", name: "Abyssal Slate", value: 150000000000, weight: 30, icon: "fa-braille", color: "#6d28d9" },
+                    { id: "shadow_quartz", name: "Shadow Quartz", value: 400000000000, weight: 15, icon: "fa-gem", color: "#4c1d95" },
+                    { id: "dark_matter", name: "Dark Matter Nugget", value: 1200000000000, weight: 8, icon: "fa-circle-dot", color: "#312e81" },
+                    { id: "singularity_shard", name: "Singularity Shard", value: 5000000000000, weight: 2, icon: "fa-[#000]", color: "#1e1b4b" }
+                ]
+            },
+            {
+                tier: 7,
+                name: "Quantum Substratum",
+                depthMeters: 250000,
+                costToUnlock: 25000000000000,
+                color: "#ec4899",
+                ores: [
+                    { id: "quantum_dust", name: "Quantum Dust", value: 15000000000000, weight: 45, icon: "fa-atom", color: "#f472b6" },
+                    { id: "chronos_sand", name: "Chronos Sand", value: 45000000000000, weight: 30, icon: "fa-hourglass", color: "#fb7185" },
+                    { id: "flux_core", name: "Tachyon Flux Core", value: 120000000000000, weight: 15, icon: "fa-arrows-spin", color: "#e11d48" },
+                    { id: "antimatter", name: "Antimatter Capsule", value: 400000000000000, weight: 8, icon: "fa-biohazard", color: "#be123c" },
+                    { id: "warp_crystal", name: "Warp Crystal", value: 1500000000000000, weight: 2, icon: "fa-bolt", color: "#fda4af" }
+                ]
+            },
+            {
+                tier: 8,
+                name: "Cosmic Fracture",
+                depthMeters: 1000000,
+                costToUnlock: 8000000000000000,
+                color: "#06b6d4",
+                ores: [
+                    { id: "astral_dust", name: "Astral Dust", value: 5000000000000000, weight: 45, icon: "fa-spa", color: "#22d3ee" },
+                    { id: "nebula_shard", name: "Nebula Shard", value: 15000000000000000, weight: 30, icon: "fa-cloud", color: "#0891b2" },
+                    { id: "starlight_ore", name: "Starlight Ore", value: 45000000000000000, weight: 15, icon: "fa-wand-magic-sparkles", color: "#67e8f9" },
+                    { id: "pulsar_stone", name: "Pulsar Stone", value: 150000000000000000, weight: 8, icon: "fa-compact-disc", color: "#155e75" },
+                    { id: "cosmic_essence", name: "Cosmic Essence", value: 600000000000000000, weight: 2, icon: "fa-certificate", color: "#a5f3fc" }
+                ]
+            },
+            {
+                tier: 9,
+                name: "Dimensional Rift",
+                depthMeters: 5000000,
+                costToUnlock: 3000000000000000000,
+                color: "#10b981",
+                ores: [
+                    { id: "rift_rock", name: "Rift Fragment", value: 2000000000000000000, weight: 45, icon: "fa-shapes", color: "#34d399" },
+                    { id: "ether_stone", name: "Ether Stone", value: 6000000000000000000, weight: 30, icon: "fa-cube", color: "#059669" },
+                    { id: "hyper_glass", name: "Hyperline Glass", value: 20000000000000000000, weight: 15, icon: "fa-border-all", color: "#10b981" },
+                    { id: "tesseract_core", name: "Tesseract Core", value: 80000000000000000000, weight: 8, icon: "fa-cubes", color: "#047857" },
+                    { id: "infinity_ore", name: "Infinity Matrix", value: 350000000000000000000, weight: 2, icon: "fa-infinity", color: "#6ee7b7" }
+                ]
+            },
+            {
+                tier: 10,
+                name: "Aetherial Void",
+                depthMeters: 25000000,
+                costToUnlock: 2000000000000000000000,
+                color: "#f43f5e",
+                ores: [
+                    { id: "aether_sand", name: "Aether Sand", value: 1200000000000000000000, weight: 45, icon: "fa-wind", color: "#fb7185" },
+                    { id: "void_crystal", name: "Prismatic Void Crystal", value: 3800000000000000000000, weight: 30, icon: "fa-gem", color: "#f43f5e" },
+                    { id: "omega_slag", name: "Omega Slag", value: 12000000000000000000000, weight: 15, icon: "fa-volcano", color: "#e11d48" },
+                    { id: "genesis_dust", name: "Genesis Dust", value: 50000000000000000000000, weight: 8, icon: "fa-sparkles", color: "#be123c" },
+                    { id: "divine_shard", name: "Divine Core", value: 250000000000000000000000, weight: 2, icon: "fa-cross", color: "#ffe4e6" }
+                ]
+            }
+        ];
+
+        /* --- GAME STATE OBJECT --- */
+        const game = {
+            cash: 0,
+            totalCashEarned: 0,
+            depthMeters: 1,
+            unlockedTier: 1,
+            totalRocksExcavated: 0,
+            totalOresSold: 0,
+            
+            // Miner stats
+            minersCount: 1,
+            minerMaxSlots: 1,
+            minerBaseSpeed: 5.0, // seconds
+            minerSpeedMult: 1.0,
+            minerMultiOreChance: 0.0,
+            
+            // Luck & Quality
+            luckMultiplier: 1.0,
+
+            // Market stats
+            marketMultiplier: 1.1,
+            autoSellEnabled: false,
+            biddingNegotiationBonus: 0.0,
+
+            // Active Market Contract
+            activeContract: null,
+            contractTimeRemaining: 45,
+
+            // Prestige
+            prestigeTokens: 0,
+            totalPrestigeResets: 0,
+            prestigeMultipliers: {
+                cashMult: 1.0,
+                speedMult: 1.0,
+                luckMult: 1.0
+            },
+
+            // Inventory: { [oreId]: count }
+            inventory: {},
+
+            // Upgrades levels: { [upgradeId]: level }
+            upgrades: {},
+
+            // Prestige perks levels: { [perkId]: level }
+            prestigePerks: {},
+
+            // Active Miner Instances runtime timers
+            minerInstances: []
+        };
+
+        /* --- UPGRADES DEFINITIONS --- */
+        const UPGRADE_DEFINITIONS = [
+            // MINING CATEGORY
+            { id: "m_speed", cat: "mining", name: "Drill Motor Overclock", desc: "Decreases miner cycle speed by 8%.", baseCost: 15, costMult: 1.5, maxLvl: 50, effect: (lvl) => 1 + (lvl * 0.08) },
+            { id: "m_slots", cat: "mining", name: "Rig Bay Expansion", desc: "Adds +1 maximum auto miner slot.", baseCost: 100, costMult: 3.5, maxLvl: 20, effect: (lvl) => lvl },
+            { id: "m_multi", cat: "mining", name: "Dual-Chamber Excavator", desc: "Grants +5% chance to extract double ore per rock.", baseCost: 250, costMult: 2.2, maxLvl: 20, effect: (lvl) => lvl * 0.05 },
+            { id: "m_manual", cat: "mining", name: "Pneumatic Hand Drill", desc: "Manual excavation breaks 2 rocks instantly per click.", baseCost: 50, costMult: 2.0, maxLvl: 10, effect: (lvl) => 1 + lvl },
+
+            // LUCK & QUALITY CATEGORY
+            { id: "l_scanner", cat: "luck", name: "Spectrometric Ore Scanner", desc: "Increases overall rare ore drop luck by +15%.", baseCost: 100, costMult: 1.8, maxLvl: 30, effect: (lvl) => 1 + (lvl * 0.15) },
+            { id: "l_purity", cat: "luck", name: "Vein Purity Probe", desc: "Increases baseline value of all mined ores by +20%.", baseCost: 300, costMult: 2.0, maxLvl: 50, effect: (lvl) => 1 + (lvl * 0.20) },
+
+            // MARKET CATEGORY
+            { id: "mk_negotiator", cat: "market", name: "Market Broker Contracts", desc: "Permanently boosts base selling margin by +10%.", baseCost: 200, costMult: 1.9, maxLvl: 40, effect: (lvl) => lvl * 0.10 },
+            { id: "mk_contract_payout", cat: "market", name: "Corporate Supply Deals", desc: "Increases bonus reward payout for fulfillable contracts by +25%.", baseCost: 1000, costMult: 2.5, maxLvl: 20, effect: (lvl) => 1 + (lvl * 0.25) },
+
+            // AUTOMATION CATEGORY
+            { id: "a_autosell", cat: "automation", name: "Automated Logistics Hub", desc: "Unlocks global Auto-Seller switch for continuous inventory liquidation.", baseCost: 500, costMult: 1.0, maxLvl: 1, effect: (lvl) => lvl > 0 },
+            { id: "a_contract_auto", cat: "automation", name: "Automated Contract Fulfillment", desc: "Automatically submits stored inventory to active bidding contracts when target is met.", baseCost: 50000, costMult: 1.0, maxLvl: 1, effect: (lvl) => lvl > 0 }
+        ];
+
+        /* --- PRESTIGE PERKS DEFINITIONS --- */
+        const PRESTIGE_PERKS = [
+            { id: "p_global_yield", name: "Quantum Core Resonance", desc: "+100% Global cash multiplier per level.", baseCost: 1, costMult: 2.0, maxLvl: 20 },
+            { id: "p_hyper_speed", name: "Sub-Spatial Overdrive", desc: "+25% Mining speed across all rigs.", baseCost: 2, costMult: 2.5, maxLvl: 15 },
+            { id: "p_cosmic_luck", name: "Cosmic Prospecting", desc: "+50% Rare Ore spawn luck multiplier.", baseCost: 3, costMult: 3.0, maxLvl: 10 }
+        ];
+
+        /* --- HELPER FUNCTIONS --- */
+        function formatNumber(num) {
+            if (num === null || num === undefined || isNaN(num)) return "0";
+            if (num < 1000) return num.toFixed(num % 1 === 0 ? 0 : 2);
+            const suffixes = ["", "K", "M", "B", "T", "Qa", "Qi", "Sx", "Sp", "Oc", "No", "Dc"];
+            const i = Math.floor(Math.log10(num) / 3);
+            if (i >= suffixes.length) return num.toExponential(2);
+            return (num / Math.pow(10, i * 3)).toFixed(2) + " " + suffixes[i];
+        }
+
+        function formatMoney(num) {
+            return "$" + formatNumber(num);
+        }
+
+        /* --- INITIALIZATION & CORE LOOP --- */
+        window.onload = function() {
+            initData();
+            loadGame();
+            setupUI();
+            startContractTimer();
+            startMainLoop();
+            checkOfflineEarnings();
+        };
+
+        function initData() {
+            ORE_TIERS.forEach(tier => {
+                tier.ores.forEach(ore => {
+                    if (!game.inventory[ore.id]) game.inventory[ore.id] = 0;
+                });
+            });
+
+            UPGRADE_DEFINITIONS.forEach(u => {
+                if (game.upgrades[u.id] === undefined) game.upgrades[u.id] = 0;
+            });
+
+            PRESTIGE_PERKS.forEach(p => {
+                if (game.prestigePerks[p.id] === undefined) game.prestigePerks[p.id] = 0;
+            });
+
+            recalculateStats();
+            syncMinerInstances();
+            generateNewContract();
+        }
+
+        function recalculateStats() {
+            // Calculate Miner Speed
+            const speedLvl = game.upgrades["m_speed"] || 0;
+            const speedUpgMult = UPGRADE_DEFINITIONS.find(u => u.id === "m_speed").effect(speedLvl);
+            const prestigeSpeedMult = 1 + ((game.prestigePerks["p_hyper_speed"] || 0) * 0.25);
+            game.minerSpeedMult = speedUpgMult * prestigeSpeedMult;
+
+            // Calculate Slots
+            const slotsLvl = game.upgrades["m_slots"] || 0;
+            game.minerMaxSlots = 1 + slotsLvl;
+
+            // Multi Ore Chance
+            const multiLvl = game.upgrades["m_multi"] || 0;
+            game.minerMultiOreChance = UPGRADE_DEFINITIONS.find(u => u.id === "m_multi").effect(multiLvl);
+
+            // Luck Multiplier
+            const scannerLvl = game.upgrades["l_scanner"] || 0;
+            const upgLuck = UPGRADE_DEFINITIONS.find(u => u.id === "l_scanner").effect(scannerLvl);
+            const prestigeLuck = 1 + ((game.prestigePerks["p_cosmic_luck"] || 0) * 0.50);
+            game.luckMultiplier = upgLuck * prestigeLuck;
+
+            // Market Negotiation
+            const negLvl = game.upgrades["mk_negotiator"] || 0;
+            game.biddingNegotiationBonus = UPGRADE_DEFINITIONS.find(u => u.id === "mk_negotiator").effect(negLvl);
+
+            // Global Cash Multiplier
+            const globalPrestigeMult = 1 + ((game.prestigePerks["p_global_yield"] || 0) * 1.0);
+            game.prestigeMultipliers.cashMult = globalPrestigeMult;
+        }
+
+        function syncMinerInstances() {
+            while (game.minerInstances.length < game.minersCount) {
+                game.minerInstances.push({
+                    id: game.minerInstances.length + 1,
+                    progress: 0,
+                    currentRock: generateRock()
+                });
+            }
+        }
+
+        /* --- ORE SELECTION ALGORITHM --- */
+        function generateRock() {
+            // Weighted random selection from unlocked tiers
+            let availableOres = [];
+            
+            for (let t = 0; t < game.unlockedTier; t++) {
+                const tierObj = ORE_TIERS[t];
+                tierObj.ores.forEach(ore => {
+                    // Apply luck to higher value rare ores
+                    let adjustedWeight = ore.weight;
+                    if (ore.weight < 20) {
+                        adjustedWeight *= game.luckMultiplier;
+                    }
+                    availableOres.push({ ore, weight: adjustedWeight });
+                });
+            }
+
+            let totalWeight = availableOres.reduce((sum, item) => sum + item.weight, 0);
+            let random = Math.random() * totalWeight;
+
+            for (let item of availableOres) {
+                if (random < item.weight) {
+                    return item.ore;
+                }
+                random -= item.weight;
+            }
+
+            return ORE_TIERS[0].ores[0]; // fallback
+        }
+
+        /* --- MINING TICK PROCESSOR --- */
+        let lastTime = performance.now();
+        function startMainLoop() {
+            function loop(now) {
+                const dt = (now - lastTime) / 1000;
+                lastTime = now;
+
+                updateMiners(dt);
+                if (game.autoSellEnabled) {
+                    autoSellTick(dt);
+                }
+                updateUIHUD();
+
+                requestAnimationFrame(loop);
+            }
+            requestAnimationFrame(loop);
+
+            // Periodic auto-save every 15s
+            setInterval(saveGame, 15000);
+            // Market fluctuation every 30s
+            setInterval(fluctuateMarket, 30000);
+        }
+
+        function updateMiners(dt) {
+            const currentCycleDuration = game.minerBaseSpeed / game.minerSpeedMult;
+
+            game.minerInstances.forEach((miner, idx) => {
+                miner.progress += dt;
+                
+                // Update DOM bar if on Rig tab
+                const bar = document.getElementById(`miner-progress-${idx}`);
+                if (bar) {
+                    const pct = Math.min(100, (miner.progress / currentCycleDuration) * 100);
+                    bar.style.width = `${pct}%`;
+                }
+
+                if (miner.progress >= currentCycleDuration) {
+                    miner.progress = 0;
+                    breakRock(miner.currentRock);
+                    miner.currentRock = generateRock();
+                    
+                    // Update current rock icon/text UI
+                    const rockText = document.getElementById(`miner-rock-name-${idx}`);
+                    if (rockText) {
+                        rockText.textContent = miner.currentRock.name;
+                        rockText.style.color = miner.currentRock.color;
+                    }
+                }
+            });
+        }
+
+        function breakRock(ore) {
+            game.totalRocksExcavated++;
+
+            // Purity boost upgrade
+            const purityLvl = game.upgrades["l_purity"] || 0;
+            const purityMult = UPGRADE_DEFINITIONS.find(u => u.id === "l_purity").effect(purityLvl);
+
+            // Quantity
+            let count = 1;
+            if (Math.random() < game.minerMultiOreChance) {
+                count += 1;
+            }
+
+            game.inventory[ore.id] = (game.inventory[ore.id] || 0) + count;
+
+            // Log rare drop
+            if (ore.weight <= 10) {
+                logDrop(`Extracted rare ${count}x ${ore.name}`, ore.color);
+            }
+
+            // Auto fulfill contract check
+            const contractAuto = game.upgrades["a_contract_auto"] || 0;
+            if (contractAuto > 0 && game.activeContract) {
+                if (game.inventory[game.activeContract.oreId] >= game.activeContract.requiredAmount) {
+                    fulfillContract();
+                }
+            }
+
+            renderInventoryGrid();
+        }
+
+        let autoSellAccumulator = 0;
+        function autoSellTick(dt) {
+            autoSellAccumulator += dt;
+            if (autoSellAccumulator >= 1.0) { // Liquidate every second
+                autoSellAccumulator = 0;
+                sellAllInventory(true);
+            }
+        }
+
+        function fluctuateMarket() {
+            // Dynamic market trend multiplier between 0.8x and 1.8x
+            const delta = (Math.random() - 0.48) * 0.3;
+            game.marketMultiplier = Math.max(0.8, Math.min(2.5, game.marketMultiplier + delta));
+            
+            const badge = document.getElementById("market-trend-badge");
+            const text = document.getElementById("market-multiplier-text");
+            if (badge && text) {
+                text.textContent = game.marketMultiplier.toFixed(2) + "x";
+                if (delta >= 0) {
+                    badge.textContent = `BULLISH (+${(delta*100).toFixed(0)}%)`;
+                    badge.className = "px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-400";
+                } else {
+                    badge.textContent = `BEARISH (${(delta*100).toFixed(0)}%)`;
+                    badge.className = "px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-rose-500/20 text-rose-400";
+                }
+            }
+        }
+
+        /* --- MARKET CONTRACT SYSTEM --- */
+        function startContractTimer() {
+            setInterval(() => {
+                if (game.contractTimeRemaining > 0) {
+                    game.contractTimeRemaining--;
+                    const timerEl = document.getElementById("contract-timer");
+                    if (timerEl) {
+                        const mins = Math.floor(game.contractTimeRemaining / 60);
+                        const secs = game.contractTimeRemaining % 60;
+                        timerEl.textContent = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+                    }
+                } else {
+                    generateNewContract();
+                }
+            }, 1000);
+        }
+
+        function generateNewContract() {
+            game.contractTimeRemaining = 60; // 60 seconds per contract
+
+            // Pick a random unlocked ore
+            let available = [];
+            for (let t = 0; t < game.unlockedTier; t++) {
+                available.push(...ORE_TIERS[t].ores);
+            }
+            const targetOre = available[Math.floor(Math.random() * available.length)];
+            const required = Math.floor(Math.random() * 15) + 5;
+
+            const contractBonusLvl = game.upgrades["mk_contract_payout"] || 0;
+            const contractBonusMult = UPGRADE_DEFINITIONS.find(u => u.id === "mk_contract_payout").effect(contractBonusLvl);
+
+            game.activeContract = {
+                oreId: targetOre.id,
+                oreName: targetOre.name,
+                requiredAmount: required,
+                bonusMultiplier: 2.0 * contractBonusMult
+            };
+
+            const targetEl = document.getElementById("contract-target");
+            const rewardEl = document.getElementById("contract-reward");
+            if (targetEl && rewardEl) {
+                targetEl.textContent = `Target: ${required}x ${targetOre.name}`;
+                rewardEl.textContent = `Bonus Payout: +${((game.activeContract.bonusMultiplier - 1) * 100).toFixed(0)}% Value`;
+            }
+        }
+
+        function fulfillContract() {
+            if (!game.activeContract) return;
+
+            const owned = game.inventory[game.activeContract.oreId] || 0;
+            if (owned >= game.activeContract.requiredAmount) {
+                // Deduct ore
+                game.inventory[game.activeContract.oreId] -= game.activeContract.requiredAmount;
+
+                // Find ore baseline value
+                let baseVal = 1;
+                ORE_TIERS.forEach(t => t.ores.forEach(o => {
+                    if (o.id === game.activeContract.oreId) baseVal = o.value;
+                }));
+
+                const totalValue = baseVal * game.activeContract.requiredAmount * game.marketMultiplier * game.activeContract.bonusMultiplier * game.prestigeMultipliers.cashMult;
+                
+                addCash(totalValue);
+                logDrop(`CONTRACT FULFILLED! Earned ${formatMoney(totalValue)}`, "#f59e0b");
+
+                generateNewContract();
+                renderInventoryGrid();
+            } else {
+                logDrop(`Contract failed: Missing required items`, "#f43f5e");
+            }
+        }
+
+        /* --- SELLING ORES --- */
+        function sellOre(oreId, count = null) {
+            const owned = game.inventory[oreId] || 0;
+            if (owned <= 0) return;
+
+            const toSell = count === null ? owned : Math.min(owned, count);
+            
+            let baseVal = 1;
+            ORE_TIERS.forEach(t => t.ores.forEach(o => {
+                if (o.id === oreId) baseVal = o.value;
+            }));
+
+            // Calculate selling value formula
+            const purityLvl = game.upgrades["l_purity"] || 0;
+            const purityMult = UPGRADE_DEFINITIONS.find(u => u.id === "l_purity").effect(purityLvl);
+            
+            const totalWorth = baseVal * toSell * purityMult * game.marketMultiplier * (1 + game.biddingNegotiationBonus) * game.prestigeMultipliers.cashMult;
+
+            game.inventory[oreId] -= toSell;
+            game.totalOresSold += toSell;
+            addCash(totalWorth);
+
+            renderInventoryGrid();
+        }
+
+        function sellAllInventory(silent = false) {
+            let totalEarned = 0;
+            let itemsSold = 0;
+
+            const purityLvl = game.upgrades["l_purity"] || 0;
+            const purityMult = UPGRADE_DEFINITIONS.find(u => u.id === "l_purity").effect(purityLvl);
+
+            ORE_TIERS.forEach(tier => {
+                tier.ores.forEach(ore => {
+                    const owned = game.inventory[ore.id] || 0;
+                    if (owned > 0) {
+                        const worth = ore.value * owned * purityMult * game.marketMultiplier * (1 + game.biddingNegotiationBonus) * game.prestigeMultipliers.cashMult;
+                        totalEarned += worth;
+                        itemsSold += owned;
+                        game.inventory[ore.id] = 0;
+                    }
+                });
+            });
+
+            if (totalEarned > 0) {
+                game.totalOresSold += itemsSold;
+                addCash(totalEarned);
+                if (!silent) {
+                    logDrop(`Liquidated ${itemsSold} ores for ${formatMoney(totalEarned)}`, "#10b981");
+                }
+                renderInventoryGrid();
+            }
+        }
+
+        function addCash(amount) {
+            game.cash += amount;
+            game.totalCashEarned += amount;
+        }
+
+        /* --- UI RENDERING & LOGIC --- */
+        function updateUIHUD() {
+            document.getElementById("hud-cash").textContent = formatMoney(game.cash);
+            document.getElementById("hud-miners").textContent = `${game.minersCount} / ${game.minerMaxSlots} Miners`;
+            document.getElementById("hud-depth").textContent = `${formatNumber(game.depthMeters)}m (Tier ${game.unlockedTier})`;
+            
+            const prestigeContainer = document.getElementById("hud-prestige-container");
+            if (game.totalPrestigeResets > 0 || game.prestigeTokens > 0) {
+                prestigeContainer.classList.remove("hidden");
+                document.getElementById("hud-prestige").textContent = `${formatNumber(game.prestigeTokens)} AP`;
+            }
+
+            // Stats tab real-time sync
+            document.getElementById("stat-total-cash").textContent = formatMoney(game.totalCashEarned);
+            document.getElementById("stat-total-rocks").textContent = formatNumber(game.totalRocksExcavated);
+            document.getElementById("stat-total-ores").textContent = formatNumber(game.totalOresSold);
+
+            // Rig stats
+            document.getElementById("rig-stat-count").textContent = game.minersCount;
+            document.getElementById("rig-stat-speed").textContent = `${(game.minerBaseSpeed / game.minerSpeedMult).toFixed(2)}s`;
+            document.getElementById("rig-stat-multi").textContent = `${(game.minerMultiOreChance * 100).toFixed(0)}%`;
+            document.getElementById("rig-stat-luck").textContent = `${game.luckMultiplier.toFixed(2)}x`;
+            document.getElementById("rig-slots-label").textContent = `Active Slots: ${game.minersCount} / ${game.minerMaxSlots}`;
+
+            // Calculate pending ascension tokens
+            const pendingTokens = calculatePendingPrestigeTokens();
+            document.getElementById("prestige-pending-tokens").textContent = `${formatNumber(pendingTokens)} AP`;
+        }
+
+        function setupUI() {
+            // TAB SWITCHING
+            const tabBtns = document.querySelectorAll(".tab-btn");
+            tabBtns.forEach(btn => {
+                btn.addEventListener("click", () => {
+                    tabBtns.forEach(b => {
+                        b.classList.remove("active", "bg-slate-700/80", "text-white");
+                        b.classList.add("text-slate-400");
+                    });
+                    btn.classList.add("active", "bg-slate-700/80", "text-white");
+                    btn.classList.remove("text-slate-400");
+
+                    const targetTab = btn.getAttribute("data-tab");
+                    document.querySelectorAll(".tab-content").forEach(c => c.classList.add("hidden"));
+                    document.getElementById(targetTab).classList.remove("hidden");
+
+                    // Trigger render updates for tab contents
+                    if (targetTab === "tab-inventory") renderInventoryGrid();
+                    if (targetTab === "tab-upgrades") renderUpgradesGrid("mining");
+                    if (targetTab === "tab-depth") renderDepthTab();
+                    if (targetTab === "tab-prestige") renderPrestigeTab();
+                    if (targetTab === "tab-stats") renderCodex();
+                });
+            });
+
+            // MANUAL MINE BUTTON
+            document.getElementById("btn-manual-mine").addEventListener("click", () => {
+                const manualLvl = game.upgrades["m_manual"] || 0;
+                const count = UPGRADE_DEFINITIONS.find(u => u.id === "m_manual").effect(manualLvl);
+                
+                for (let i = 0; i < count; i++) {
+                    const ore = generateRock();
+                    breakRock(ore);
+                }
+            });
+
+            // BUY MINER SLOT / MINER PURCHASING
+            renderMinersGrid();
+
+            // INVENTORY SELL ALL
+            document.getElementById("btn-sell-all").addEventListener("click", () => sellAllInventory(false));
+
+            // FULFILL CONTRACT
+            document.getElementById("btn-fulfill-contract").addEventListener("click", fulfillContract);
+
+            // AUTO SELL TOGGLE
+            const autoSellToggle = document.getElementById("toggle-autosell");
+            autoSellToggle.checked = game.autoSellEnabled;
+            autoSellToggle.addEventListener("change", (e) => {
+                const autoSellUnlocked = (game.upgrades["a_autosell"] || 0) > 0;
+                if (!autoSellUnlocked) {
+                    e.target.checked = false;
+                    logDrop("Auto-Seller locked! Purchase in Upgrades tab.", "#f43f5e");
+                    return;
+                }
+                game.autoSellEnabled = e.target.checked;
+            });
+
+            // UPGRADES CATEGORY TABS
+            document.querySelectorAll(".upg-cat-btn").forEach(btn => {
+                btn.addEventListener("click", () => {
+                    document.querySelectorAll(".upg-cat-btn").forEach(b => {
+                        b.className = "upg-cat-btn px-4 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 text-slate-400 border border-transparent hover:bg-slate-700";
+                    });
+                    btn.className = "upg-cat-btn px-4 py-1.5 rounded-lg text-xs font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/30";
+                    renderUpgradesGrid(btn.getAttribute("data-upgrade-cat"));
+                });
+            });
+
+            // DEPTH DRILL DEEPER
+            document.getElementById("btn-drill-deeper").addEventListener("click", drillDeeper);
+
+            // ASCENSION RESET
+            document.getElementById("btn-do-prestige").addEventListener("click", performPrestigeReset);
+
+            // SETTINGS MODAL
+            document.getElementById("btn-settings").addEventListener("click", () => {
+                document.getElementById("modal-settings").classList.remove("hidden");
+            });
+            document.getElementById("btn-close-settings").addEventListener("click", () => {
+                document.getElementById("modal-settings").classList.add("hidden");
+            });
+
+            // SAVE & RESET BUTTONS
+            document.getElementById("btn-save").addEventListener("click", () => {
+                saveGame();
+                logDrop("Game manually saved.", "#38bdf8");
+            });
+            document.getElementById("btn-manual-save").addEventListener("click", saveGame);
+            document.getElementById("btn-export-save").addEventListener("click", exportSave);
+            document.getElementById("btn-import-save").addEventListener("click", importSave);
+            document.getElementById("btn-hard-reset").addEventListener("click", hardReset);
+
+            document.getElementById("btn-claim-offline").addEventListener("click", () => {
+                document.getElementById("modal-offline").classList.add("hidden");
+            });
+
+            // INITIAL RENDER CALLS
+            renderMinersGrid();
+            renderUpgradesGrid("mining");
+        }
+
+        /* --- RENDER FUNCTIONS --- */
+        function renderMinersGrid() {
+            const grid = document.getElementById("miners-grid");
+            grid.innerHTML = "";
+
+            syncMinerInstances();
+
+            for (let i = 0; i < game.minerMaxSlots; i++) {
+                const isActive = i < game.minersCount;
+                const card = document.createElement("div");
+                card.className = `border rounded-xl p-4 flex flex-col justify-between transition ${isActive ? 'bg-slate-800/80 border-slate-700' : 'bg-slate-900/40 border-slate-800 opacity-60'}`;
+
+                if (isActive) {
+                    const instance = game.minerInstances[i];
+                    card.innerHTML = `
+                        <div>
+                            <div class="flex items-center justify-between mb-2">
+                                <div class="flex items-center space-x-2">
+                                    <i class="fa-solid fa-robot text-amber-400 text-sm"></i>
+                                    <span class="font-bold text-xs text-slate-200">Miner Rig #${i + 1}</span>
+                                </div>
+                                <span class="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">ACTIVE</span>
+                            </div>
+                            <div class="text-xs text-slate-400 mb-3 flex justify-between">
+                                <span>Mining Target:</span>
+                                <strong id="miner-rock-name-${i}" style="color: ${instance.currentRock.color}">${instance.currentRock.name}</strong>
+                            </div>
+                        </div>
+                        <div class="space-y-1">
+                            <div class="w-full bg-slate-900 h-2 rounded-full overflow-hidden border border-slate-700">
+                                <div id="miner-progress-${i}" class="bg-amber-500 h-full progress-bar" style="width: 0%"></div>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    const minerBuyCost = Math.floor(100 * Math.pow(2.8, game.minersCount));
+                    card.innerHTML = `
+                        <div class="text-center py-4 space-y-2">
+                            <i class="fa-solid fa-lock text-slate-600 text-xl"></i>
+                            <div class="text-xs font-semibold text-slate-400">Locked Slot #${i + 1}</div>
+                            <button onclick="purchaseMiner(${minerBuyCost})" class="py-1.5 px-3 bg-amber-600/80 hover:bg-amber-500 text-slate-950 font-bold text-xs rounded transition mt-2">
+                                ACTIVATE MINER (${formatMoney(minerBuyCost)})
+                            </button>
+                        </div>
+                    `;
+                }
+                grid.appendChild(card);
+            }
+        }
+
+        function purchaseMiner(cost) {
+            if (game.cash >= cost && game.minersCount < game.minerMaxSlots) {
+                game.cash -= cost;
+                game.minersCount++;
+                syncMinerInstances();
+                renderMinersGrid();
+                updateUIHUD();
+                logDrop(`Purchased Auto Miner Rig #${game.minersCount}!`, "#f59e0b");
+            } else if (game.cash < cost) {
+                logDrop("Insufficient funds to activate miner slot.", "#f43f5e");
+            }
+        }
+
+        function renderInventoryGrid() {
+            const grid = document.getElementById("ore-inventory-grid");
+            if (!grid) return;
+
+            grid.innerHTML = "";
+            let totalStored = 0;
+
+            const searchQuery = (document.getElementById("inventory-search")?.value || "").toLowerCase();
+
+            ORE_TIERS.forEach(tier => {
+                tier.ores.forEach(ore => {
+                    const count = game.inventory[ore.id] || 0;
+                    totalStored += count;
+
+                    if (searchQuery && !ore.name.toLowerCase().includes(searchQuery) && !tier.name.toLowerCase().includes(searchQuery)) {
+                        return;
+                    }
+
+                    if (count === 0 && document.getElementById("btn-filter-owned")?.classList.contains("active")) {
+                        return;
+                    }
+
+                    const card = document.createElement("div");
+                    card.className = `bg-slate-800/60 border border-slate-700/60 rounded-xl p-3 flex flex-col justify-between transition ${count > 0 ? 'opacity-100' : 'opacity-40'}`;
+                    
+                    const oreValueCalculated = ore.value * game.marketMultiplier * (1 + game.biddingNegotiationBonus) * game.prestigeMultipliers.cashMult;
+
+                    card.innerHTML = `
+                        <div>
+                            <div class="flex items-center justify-between mb-1">
+                                <span class="text-[10px] uppercase font-mono text-slate-400">Tier ${tier.tier}</span>
+                                <span class="font-mono text-xs font-bold" style="color: ${ore.color}">${count} Stored</span>
+                            </div>
+                            <div class="flex items-center space-x-2 mb-2">
+                                <i class="fa-solid ${ore.icon} text-base" style="color: ${ore.color}"></i>
+                                <span class="text-xs font-semibold text-slate-200">${ore.name}</span>
+                            </div>
+                            <div class="text-[11px] text-slate-400 font-mono mb-3">
+                                Value: <span class="text-emerald-400">${formatMoney(oreValueCalculated)}</span> / ea
+                            </div>
+                        </div>
+                        <div class="flex gap-1">
+                            <button onclick="sellOre('${ore.id}', 1)" ${count === 0 ? 'disabled' : ''} class="flex-1 py-1 px-2 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-slate-200 text-[11px] rounded transition">
+                                Sell 1
+                            </button>
+                            <button onclick="sellOre('${ore.id}', null)" ${count === 0 ? 'disabled' : ''} class="flex-1 py-1 px-2 bg-emerald-600/80 hover:bg-emerald-500 disabled:opacity-50 text-slate-950 font-bold text-[11px] rounded transition">
+                                Sell All
+                            </button>
+        /* --- RENDER FUNCTIONS FOR CLASSIC WEB 1.0 DESIGN --- */
+        function renderMinersGrid() {
+            const grid = document.getElementById("miners-grid");
+            grid.innerHTML = "";
+
+            syncMinerInstances();
+
+            for (let i = 0; i < game.minerMaxSlots; i++) {
+                const isActive = i < game.minersCount;
+                const card = document.createElement("div");
+                card.className = "infobox";
+                card.style.marginBottom = "10px";
+
+                if (isActive) {
+                    const instance = game.minerInstances[i];
+                    card.innerHTML = `
+                        <div>
+                            <strong>Auto-Miner Rig #${i + 1}</strong> [Status: ACTIVE]
+                            <br>
+                            Current Target Rock: <strong id="miner-rock-name-${i}">${instance.currentRock.name}</strong>
+                            <div class="progress-container">
+                                <div id="miner-progress-${i}" class="progress-bar"></div>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    const minerBuyCost = Math.floor(100 * Math.pow(2.8, game.minersCount));
+                    card.innerHTML = `
+                        <div>
+                            <strong>Locked Miner Slot #${i + 1}</strong>
+                            <br>
+                            <button onclick="purchaseMiner(${minerBuyCost})">Activate Miner Slot (${formatMoney(minerBuyCost)})</button>
+                        </div>
+                    `;
+                }
+                grid.appendChild(card);
+            }
+        }
+
+        function renderInventoryGrid() {
+            const grid = document.getElementById("ore-inventory-grid");
+            if (!grid) return;
+
+            grid.innerHTML = "";
+            let totalStored = 0;
+
+            const searchQuery = (document.getElementById("inventory-search")?.value || "").toLowerCase();
+
+            ORE_TIERS.forEach(tier => {
+                tier.ores.forEach(ore => {
+                    const count = game.inventory[ore.id] || 0;
+                    totalStored += count;
+
+                    if (searchQuery && !ore.name.toLowerCase().includes(searchQuery) && !tier.name.toLowerCase().includes(searchQuery)) {
+                        return;
+                    }
+
+                    if (count === 0 && document.getElementById("btn-filter-owned")?.classList.contains("active")) {
+                        return;
+                    }
+
+                    const row = document.createElement("tr");
+                    const oreValueCalculated = ore.value * game.marketMultiplier * (1 + game.biddingNegotiationBonus) * game.prestigeMultipliers.cashMult;
+
+                    row.innerHTML = `
+                        <td>Tier ${tier.tier}</td>
+                        <td><strong>${ore.name}</strong></td>
+                        <td>${count}</td>
+                        <td>${formatMoney(oreValueCalculated)}</td>
+                        <td>
+                            <button onclick="sellOre('${ore.id}', 1)" ${count === 0 ? 'disabled' : ''}>Sell 1</button>
+                            <button onclick="sellOre('${ore.id}', null)" ${count === 0 ? 'disabled' : ''}>Sell All</button>
+                        </td>
+                    `;
+                    grid.appendChild(row);
+                });
+            });
+
+            const totalCapEl = document.getElementById("inventory-capacity-text");
+            if (totalCapEl) totalCapEl.textContent = `Total Items Stored: ${formatNumber(totalStored)}`;
+        }
+
+        function renderUpgradesGrid(category) {
+            const grid = document.getElementById("upgrades-grid");
+            if (!grid) return;
+            grid.innerHTML = "";
+
+            const filtered = UPGRADE_DEFINITIONS.filter(u => u.cat === category);
+
+            filtered.forEach(upg => {
+                const currentLvl = game.upgrades[upg.id] || 0;
+                const cost = Math.floor(upg.baseCost * Math.pow(upg.costMult, currentLvl));
+                const isMax = currentLvl >= upg.maxLvl;
+
+                const card = document.createElement("div");
+                card.className = "infobox";
+
+                card.innerHTML = `
+                    <h3>${upg.name} (Level ${currentLvl} / ${upg.maxLvl})</h3>
+                    <p>${upg.desc}</p>
+                    <button onclick="buyUpgrade('${upg.id}')" ${isMax || game.cash < cost ? 'disabled' : ''}>
+                        ${isMax ? 'MAX LEVEL' : `Purchase Upgrade (${formatMoney(cost)})`}
+                    </button>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        function renderDepthTab() {
+            const currentTierObj = ORE_TIERS[game.unlockedTier - 1];
+            const nextTierObj = ORE_TIERS[game.unlockedTier];
+
+            document.getElementById("depth-tier-indicator").textContent = `Tier ${currentTierObj.tier}: ${currentTierObj.name}`;
+            document.getElementById("depth-current-name").textContent = `Current Depth: ${formatNumber(game.depthMeters)} Meters`;
+
+            const targetText = document.getElementById("depth-next-target");
+            const btnDrill = document.getElementById("btn-drill-deeper");
+            const costText = document.getElementById("depth-cost-text");
+
+            if (nextTierObj) {
+                targetText.textContent = `${formatNumber(nextTierObj.depthMeters)} Meters (${nextTierObj.name})`;
+                costText.textContent = formatMoney(nextTierObj.costToUnlock);
+                btnDrill.disabled = game.cash < nextTierObj.costToUnlock;
+            } else {
+                targetText.textContent = "MAX DEPTH REACHED";
+                btnDrill.disabled = true;
+                costText.textContent = "N/A";
+            }
+
+            // Render strata map as classic table
+            const strataContainer = document.getElementById("tier-strata-list");
+            strataContainer.innerHTML = "";
+
+            const table = document.createElement("table");
+            table.className = "wikitable";
+            table.innerHTML = `
+                <thead>
+                    <tr>
+                        <th>Tier</th>
+                        <th>Strata Name</th>
+                        <th>Depth Target</th>
+                        <th>Extractable Ore Types</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody id="strata-table-body"></tbody>
+            `;
+            strataContainer.appendChild(table);
+
+            const tbody = table.querySelector("#strata-table-body");
+
+            ORE_TIERS.forEach(t => {
+                const isUnlocked = t.tier <= game.unlockedTier;
+                const row = document.createElement("tr");
+
+                const oreListNames = t.ores.map(o => o.name).join(", ");
+
+                row.innerHTML = `
+                    <td>Tier ${t.tier}</td>
+                    <td><strong>${t.name}</strong></td>
+                    <td>${formatNumber(t.depthMeters)}m</td>
+                    <td>${oreListNames}</td>
+                    <td><strong>${isUnlocked ? 'UNLOCKED' : 'LOCKED'}</strong></td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        function renderPrestigeTab() {
+            const grid = document.getElementById("prestige-perks-grid");
+            if (!grid) return;
+            grid.innerHTML = "";
+
+            PRESTIGE_PERKS.forEach(perk => {
+                const currentLvl = game.prestigePerks[perk.id] || 0;
+                const cost = Math.floor(perk.baseCost * Math.pow(perk.costMult, currentLvl));
+                const isMax = currentLvl >= perk.maxLvl;
+
+                const card = document.createElement("div");
+                card.className = "infobox";
+
+                card.innerHTML = `
+                    <h3>${perk.name} (Level ${currentLvl} / ${perk.maxLvl})</h3>
+                    <p>${perk.desc}</p>
+                    <button onclick="buyPrestigePerk('${perk.id}')" ${isMax || game.prestigeTokens < cost ? 'disabled' : ''}>
+                        ${isMax ? 'MAX PERK' : `Purchase Perk (${cost} AP)`}
+                    </button>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        function renderCodex() {
+            const container = document.getElementById("stats-ore-codex");
+            if (!container) return;
+            container.innerHTML = "";
+
+            const table = document.createElement("table");
+            table.className = "wikitable";
+            table.innerHTML = `
+                <thead>
+                    <tr>
+                        <th>Tier</th>
+                        <th>Mineral Name</th>
+                        <th>Base Value</th>
+                    </tr>
+                </thead>
+                <tbody id="codex-table-body"></tbody>
+            `;
+            container.appendChild(table);
+
+            const tbody = table.querySelector("#codex-table-body");
+
+            ORE_TIERS.forEach(t => {
+                t.ores.forEach(o => {
+                    const discovered = (game.inventory[o.id] || 0) > 0 || game.unlockedTier >= t.tier;
+                    const row = document.createElement("tr");
+
+                    row.innerHTML = `
+                        <td>Tier ${t.tier}</td>
+                        <td><strong>${discovered ? o.name : '??? [Undiscovered]'}</strong></td>
+                        <td>${discovered ? formatMoney(o.value) : '???'}</td>
+                    `;
+                    tbody.appendChild(row);
+                });
+            });
+        }
+
+        /* --- LOGGING ACTIVITY --- */
+        function logDrop(msg, color = "#94a3b8") {
+            const logContainer = document.getElementById("drop-log");
+            if (!logContainer) return;
+
+            const entry = document.createElement("div");
+            entry.style.color = color;
+            entry.textContent = `> ${msg}`;
+
+            logContainer.prepend(entry);
+            if (logContainer.children.length > 25) {
+                logContainer.removeChild(logContainer.lastChild);
+            }
+        }
+
+        /* --- OFFLINE PROGRESS CALCULATOR --- */
+        function checkOfflineEarnings() {
+            const lastSaveTime = localStorage.getItem("core_ore_save_time");
+            if (!lastSaveTime) return;
+
+            const now = Date.now();
+            const elapsedSeconds = Math.floor((now - parseInt(lastSaveTime)) / 1000);
+
+            if (elapsedSeconds > 30) { // Off for more than 30 seconds
+                const cycleSpeed = game.minerBaseSpeed / game.minerSpeedMult;
+                const totalCycles = Math.floor((elapsedSeconds / cycleSpeed) * game.minersCount);
+
+                let estimatedRevenue = 0;
+                for (let i = 0; i < Math.min(totalCycles, 1000); i++) {
+                    const ore = generateRock();
+                    estimatedRevenue += ore.value;
+                }
+                if (totalCycles > 1000) {
+                    estimatedRevenue *= (totalCycles / 1000);
+                }
+
+                // Apply market + multipliers
+                estimatedRevenue *= game.marketMultiplier * game.prestigeMultipliers.cashMult;
+
+                addCash(estimatedRevenue);
+                game.totalRocksExcavated += totalCycles;
+
+                document.getElementById("offline-time-text").textContent = `You were away for ${Math.floor(elapsedSeconds / 60)} minutes.`;
+                document.getElementById("offline-rocks-count").textContent = formatNumber(totalCycles);
+                document.getElementById("offline-cash-earned").textContent = formatMoney(estimatedRevenue);
+
+                document.getElementById("modal-offline").classList.remove("hidden");
+            }
+        }
+
+        /* --- SAVE / LOAD / EXPORT SYSTEMS --- */
+        function saveGame() {
+            const saveData = {
+                cash: game.cash,
+                totalCashEarned: game.totalCashEarned,
+                depthMeters: game.depthMeters,
+                unlockedTier: game.unlockedTier,
+                totalRocksExcavated: game.totalRocksExcavated,
+                totalOresSold: game.totalOresSold,
+                minersCount: game.minersCount,
+                autoSellEnabled: game.autoSellEnabled,
+                prestigeTokens: game.prestigeTokens,
+                totalPrestigeResets: game.totalPrestigeResets,
+                inventory: game.inventory,
+                upgrades: game.upgrades,
+                prestigePerks: game.prestigePerks
+            };
+
+            localStorage.setItem("core_ore_save", JSON.stringify(saveData));
+            localStorage.setItem("core_ore_save_time", Date.now().toString());
+        }
+
+        function loadGame() {
+            const saved = localStorage.getItem("core_ore_save");
+            if (!saved) return;
+
+            try {
+                const parsed = JSON.parse(saved);
+                Object.assign(game, parsed);
+                recalculateStats();
+            } catch (e) {
+                console.error("Failed to load save data", e);
+            }
+        }
+
+        function exportSave() {
+            saveGame();
+            const raw = localStorage.getItem("core_ore_save");
+            const b64 = btoa(raw);
+            navigator.clipboard?.writeText(b64);
+            alert("Save string copied to clipboard!");
+        }
+
+        function importSave() {
+            const str = prompt("Paste your export save code:");
+            if (!str) return;
+            try {
+                const decoded = atob(str);
+                JSON.parse(decoded);
+                localStorage.setItem("core_ore_save", decoded);
+                location.reload();
+            } catch(e) {
+                alert("Invalid save string!");
+            }
+        }
+
+        function hardReset() {
+            if (confirm("Are you ABSOLUTELY sure you want to erase all game progress? This cannot be undone.")) {
+                localStorage.removeItem("core_ore_save");
+                localStorage.removeItem("core_ore_save_time");
+                location.reload();
+            }
+        }
+    </script>
+</body>
+</html>
