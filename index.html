@@ -93,17 +93,60 @@
             margin-bottom: 15px;
             font-family: Arial, sans-serif;
             font-size: 0.9em;
+            transition: background-color 0.3s ease;
+        }
+
+        /* Power Outage Banner */
+        .power-outage-box {
+            background-color: #ffcccc !important;
+            border: 2px solid #cc0000 !important;
+            color: #990000;
+            padding: 10px;
+            margin-bottom: 15px;
+            font-family: Arial, sans-serif;
+            font-weight: bold;
+            animation: pulse-outage 1s infinite alternate;
+        }
+
+        @keyframes pulse-outage {
+            0% { background-color: #ffcccc; }
+            100% { background-color: #ffaaaa; }
+        }
+
+        /* High Market Price Glow */
+        .market-surge {
+            background-color: #e6ffe6 !important;
+            border: 2px solid #00aa00 !important;
+            font-weight: bold;
+            animation: flash-green 1.5s infinite;
+        }
+
+        @keyframes flash-green {
+            0% { border-color: #00aa00; }
+            50% { border-color: #006600; }
+            100% { border-color: #00aa00; }
+        }
+
+        /* Rare Ore Found Visual Notification */
+        .rare-ore-found {
+            animation: highlight-gold 1s ease-out;
+        }
+
+        @keyframes highlight-gold {
+            0% { background-color: #ffff99; }
+            100% { background-color: #ffffff; }
         }
 
         /* Classic Form Elements */
         button, input[type="button"], input[type="submit"] {
             font-family: Arial, sans-serif;
             font-size: 0.85em;
-            padding: 2px 8px;
+            padding: 3px 10px;
             background-color: #f8f9fa;
             border: 1px solid #a2a9b1;
             color: #000000;
             cursor: pointer;
+            margin: 2px;
         }
 
         button:hover {
@@ -139,7 +182,7 @@
             border: 1px solid #a2a9b1;
             font-family: monospace;
             font-size: 0.85em;
-            height: 100px;
+            height: 120px;
             overflow-y: auto;
             padding: 5px;
         }
@@ -170,14 +213,23 @@
             width: 100%;
             background-color: #e0e0e0;
             border: 1px solid #72777d;
-            height: 12px;
+            height: 14px;
             margin-top: 4px;
+            margin-bottom: 4px;
+            position: relative;
         }
 
         .progress-bar {
             height: 100%;
             background-color: #0645ad;
             width: 0%;
+            transition: width 0.1s linear;
+        }
+
+        .miner-status-text {
+            font-size: 0.85em;
+            font-family: Arial, sans-serif;
+            font-weight: bold;
         }
     </style>
 </head>
@@ -194,6 +246,11 @@
             [<a id="btn-save" href="javascript:void(0)">Save Game</a>] 
             [<a id="btn-settings" href="javascript:void(0)">Settings</a>]
         </div>
+    </div>
+
+    <!-- DYNAMIC EVENT ALERT BANNERS -->
+    <div id="power-outage-banner" class="power-outage-box hidden">
+        ⚠️ POWER GRID OVERLOAD DETECTED! Rigs stalling... [<button id="btn-fix-power">Restore Power Surge</button>]
     </div>
 
     <!-- MAIN NAVIGATION TABS -->
@@ -213,12 +270,6 @@
         <!-- TAB 1: MINING RIG -->
         <div id="tab-rig" class="tab-content">
             <h2>Auto-Miner Excavation Deck</h2>
-            
-            <div class="infobox">
-                <h3>Manual Drill Control</h3>
-                <p>Click below to force an immediate manual break on the rock target:</p>
-                <button id="btn-manual-mine"><b>[ EXCAVATE ROCK NOW ]</b></button>
-            </div>
 
             <table class="wikitable">
                 <tr>
@@ -229,11 +280,11 @@
                     <td><span id="rig-stat-count">1</span></td>
                 </tr>
                 <tr>
-                    <td>Cycle Time per Mine:</td>
+                    <td>Cycle Duration (Scan/Mine/Polish):</td>
                     <td><span id="rig-stat-speed">5.00s</span></td>
                 </tr>
                 <tr>
-                    <td>Multi-Ore Spawn Chance:</td>
+                    <td>Multi-Ore Extraction Chance:</td>
                     <td><span id="rig-stat-multi">0%</span></td>
                 </tr>
                 <tr>
@@ -244,12 +295,12 @@
 
             <h3>Active Mining Nodes (<span id="rig-slots-label">1 / 1</span>)</h3>
             <div id="miners-grid">
-                <!-- Dynamic miners list -->
+                <!-- Dynamic miners list with icons & progress phase indicators -->
             </div>
 
             <h3>Recent Excavation Activity Log</h3>
             <div id="drop-log" class="log-box">
-                <div>> Automated rig initialized. Ready for operations.</div>
+                <div>> Automated rig initialized. Standby for excavation activity.</div>
             </div>
         </div>
 
@@ -257,8 +308,8 @@
         <div id="tab-inventory" class="tab-content hidden">
             <h2>Ore Inventory & Market Trade Index</h2>
 
-            <div class="infobox">
-                <strong>Current Market Multiplier:</strong> <span id="market-multiplier-text">1.10x</span> (<span id="market-trend-badge">STABLE</span>)
+            <div id="market-infobox" class="infobox">
+                <strong>Current Market Index:</strong> <span id="market-multiplier-text">1.10x</span> (<span id="market-trend-badge">STABLE</span>)
                 <br><br>
                 <label>
                     <input type="checkbox" id="toggle-autosell"> Enable Automated Continuous Liquidation (Auto-Seller)
@@ -582,10 +633,13 @@
             // Miner stats
             minersCount: 1,
             minerMaxSlots: 1,
-            minerBaseSpeed: 5.0, // seconds
+            minerBaseSpeed: 6.0, // base total seconds for full cycle (scan + mine + polish)
             minerSpeedMult: 1.0,
             minerMultiOreChance: 0.0,
             
+            // Power Outage Event
+            powerOutageActive: false,
+
             // Luck & Quality
             luckMultiplier: 1.0,
 
@@ -626,7 +680,6 @@
             { id: "m_speed", cat: "mining", name: "Drill Motor Overclock", desc: "Decreases miner cycle speed by 8%.", baseCost: 15, costMult: 1.5, maxLvl: 50, effect: (lvl) => 1 + (lvl * 0.08) },
             { id: "m_slots", cat: "mining", name: "Rig Bay Expansion", desc: "Adds +1 maximum auto miner slot.", baseCost: 100, costMult: 3.5, maxLvl: 20, effect: (lvl) => lvl },
             { id: "m_multi", cat: "mining", name: "Dual-Chamber Excavator", desc: "Grants +5% chance to extract double ore per rock.", baseCost: 250, costMult: 2.2, maxLvl: 20, effect: (lvl) => lvl * 0.05 },
-            { id: "m_manual", cat: "mining", name: "Pneumatic Hand Drill", desc: "Manual excavation breaks 2 rocks instantly per click.", baseCost: 50, costMult: 2.0, maxLvl: 10, effect: (lvl) => 1 + lvl },
 
             // LUCK & QUALITY CATEGORY
             { id: "l_scanner", cat: "luck", name: "Spectrometric Ore Scanner", desc: "Increases overall rare ore drop luck by +15%.", baseCost: 100, costMult: 1.8, maxLvl: 30, effect: (lvl) => 1 + (lvl * 0.15) },
@@ -727,20 +780,18 @@
                 game.minerInstances.push({
                     id: game.minerInstances.length + 1,
                     progress: 0,
+                    phase: 'scanning', // phases: 'scanning', 'mining', 'polishing'
                     currentRock: generateRock()
                 });
             }
         }
 
-        /* --- ORE SELECTION ALGORITHM --- */
         function generateRock() {
-            // Weighted random selection from unlocked tiers
             let availableOres = [];
             
             for (let t = 0; t < game.unlockedTier; t++) {
                 const tierObj = ORE_TIERS[t];
                 tierObj.ores.forEach(ore => {
-                    // Apply luck to higher value rare ores
                     let adjustedWeight = ore.weight;
                     if (ore.weight < 20) {
                         adjustedWeight *= game.luckMultiplier;
@@ -759,7 +810,7 @@
                 random -= item.weight;
             }
 
-            return ORE_TIERS[0].ores[0]; // fallback
+            return ORE_TIERS[0].ores[0];
         }
 
         /* --- MINING TICK PROCESSOR --- */
@@ -769,7 +820,10 @@
                 const dt = (now - lastTime) / 1000;
                 lastTime = now;
 
-                updateMiners(dt);
+                if (!game.powerOutageActive) {
+                    updateMiners(dt);
+                }
+                
                 if (game.autoSellEnabled) {
                     autoSellTick(dt);
                 }
@@ -781,46 +835,72 @@
 
             // Periodic auto-save every 15s
             setInterval(saveGame, 15000);
-            // Market fluctuation every 30s
-            setInterval(fluctuateMarket, 30000);
+            // Market fluctuation every 25s
+            setInterval(fluctuateMarket, 25000);
+            // Random Power Outage Event Chance every 45s
+            setInterval(checkPowerOutageEvent, 45000);
+        }
+
+        function checkPowerOutageEvent() {
+            if (!game.powerOutageActive && Math.random() < 0.15) { // 15% chance
+                game.powerOutageActive = true;
+                const banner = document.getElementById("power-outage-banner");
+                if (banner) banner.classList.remove("hidden");
+                logDrop("⚠️ POWER GRID OVERHEAT! All miners temporarily stalled.", "#990000");
+            }
         }
 
         function updateMiners(dt) {
-            const currentCycleDuration = game.minerBaseSpeed / game.minerSpeedMult;
+            const cycleDuration = game.minerBaseSpeed / game.minerSpeedMult;
+            const phaseDuration = cycleDuration / 3; // divided across 3 phases
 
             game.minerInstances.forEach((miner, idx) => {
                 miner.progress += dt;
                 
-                // Update DOM bar if on Rig tab
-                const bar = document.getElementById(`miner-progress-${idx}`);
-                if (bar) {
-                    const pct = Math.min(100, (miner.progress / currentCycleDuration) * 100);
-                    bar.style.width = `${pct}%`;
+                // Determine phase: Phase 1 (0-1/3): Scanning, Phase 2 (1/3-2/3): Mining, Phase 3 (2/3-1): Polishing
+                let currentPhase = 'scanning';
+                let phaseProgress = 0;
+
+                if (miner.progress < phaseDuration) {
+                    currentPhase = 'scanning';
+                    phaseProgress = (miner.progress / phaseDuration) * 100;
+                } else if (miner.progress < phaseDuration * 2) {
+                    currentPhase = 'mining';
+                    phaseProgress = ((miner.progress - phaseDuration) / phaseDuration) * 100;
+                } else if (miner.progress < cycleDuration) {
+                    currentPhase = 'polishing';
+                    phaseProgress = ((miner.progress - (phaseDuration * 2)) / phaseDuration) * 100;
+                } else {
+                    // Completed full cycle
+                    miner.progress = 0;
+                    breakRock(miner.currentRock, idx);
+                    miner.currentRock = generateRock();
+                    currentPhase = 'scanning';
+                    phaseProgress = 0;
                 }
 
-                if (miner.progress >= currentCycleDuration) {
-                    miner.progress = 0;
-                    breakRock(miner.currentRock);
-                    miner.currentRock = generateRock();
-                    
-                    // Update current rock icon/text UI
-                    const rockText = document.getElementById(`miner-rock-name-${idx}`);
-                    if (rockText) {
-                        rockText.textContent = miner.currentRock.name;
-                        rockText.style.color = miner.currentRock.color;
-                    }
+                miner.phase = currentPhase;
+
+                // DOM UI update for miner card
+                const bar = document.getElementById(`miner-progress-${idx}`);
+                const statusText = document.getElementById(`miner-status-${idx}`);
+                const rockText = document.getElementById(`miner-rock-name-${idx}`);
+
+                if (bar) bar.style.width = `${Math.min(100, phaseProgress)}%`;
+                if (statusText) {
+                    if (currentPhase === 'scanning') statusText.textContent = "⏳ Phase 1/3: Scanning & Locating Rock Target...";
+                    if (currentPhase === 'mining') statusText.textContent = "⛏️ Phase 2/3: Mining Core Vein...";
+                    if (currentPhase === 'polishing') statusText.textContent = "💎 Phase 3/3: Polishing & Extracting Ore...";
+                }
+                if (rockText) {
+                    rockText.textContent = miner.currentRock.name;
                 }
             });
         }
 
-        function breakRock(ore) {
+        function breakRock(ore, minerIdx) {
             game.totalRocksExcavated++;
 
-            // Purity boost upgrade
-            const purityLvl = game.upgrades["l_purity"] || 0;
-            const purityMult = UPGRADE_DEFINITIONS.find(u => u.id === "l_purity").effect(purityLvl);
-
-            // Quantity
             let count = 1;
             if (Math.random() < game.minerMultiOreChance) {
                 count += 1;
@@ -828,9 +908,14 @@
 
             game.inventory[ore.id] = (game.inventory[ore.id] || 0) + count;
 
-            // Log rare drop
-            if (ore.weight <= 10) {
-                logDrop(`Extracted rare ${count}x ${ore.name}`, ore.color);
+            // Flash rare drop visually on miner card
+            if (ore.weight <= 15) {
+                logDrop(`Extracted rare ${count}x ${ore.name}!`, "#006600");
+                const card = document.getElementById(`miner-card-${minerIdx}`);
+                if (card) {
+                    card.classList.add("rare-ore-found");
+                    setTimeout(() => card.classList.remove("rare-ore-found"), 1000);
+                }
             }
 
             // Auto fulfill contract check
@@ -847,27 +932,31 @@
         let autoSellAccumulator = 0;
         function autoSellTick(dt) {
             autoSellAccumulator += dt;
-            if (autoSellAccumulator >= 1.0) { // Liquidate every second
+            if (autoSellAccumulator >= 1.0) {
                 autoSellAccumulator = 0;
                 sellAllInventory(true);
             }
         }
 
         function fluctuateMarket() {
-            // Dynamic market trend multiplier between 0.8x and 1.8x
-            const delta = (Math.random() - 0.48) * 0.3;
+            const delta = (Math.random() - 0.48) * 0.35;
             game.marketMultiplier = Math.max(0.8, Math.min(2.5, game.marketMultiplier + delta));
             
             const badge = document.getElementById("market-trend-badge");
             const text = document.getElementById("market-multiplier-text");
+            const infobox = document.getElementById("market-infobox");
+
             if (badge && text) {
                 text.textContent = game.marketMultiplier.toFixed(2) + "x";
-                if (delta >= 0) {
+                if (game.marketMultiplier >= 1.6) {
+                    badge.textContent = `HIGH MARKET SURGE (+${((game.marketMultiplier - 1)*100).toFixed(0)}%)`;
+                    if (infobox) infobox.className = "infobox market-surge";
+                } else if (delta >= 0) {
                     badge.textContent = `BULLISH (+${(delta*100).toFixed(0)}%)`;
-                    badge.className = "px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-400";
+                    if (infobox) infobox.className = "infobox";
                 } else {
                     badge.textContent = `BEARISH (${(delta*100).toFixed(0)}%)`;
-                    badge.className = "px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-rose-500/20 text-rose-400";
+                    if (infobox) infobox.className = "infobox";
                 }
             }
         }
@@ -890,9 +979,8 @@
         }
 
         function generateNewContract() {
-            game.contractTimeRemaining = 60; // 60 seconds per contract
+            game.contractTimeRemaining = 60;
 
-            // Pick a random unlocked ore
             let available = [];
             for (let t = 0; t < game.unlockedTier; t++) {
                 available.push(...ORE_TIERS[t].ores);
@@ -923,10 +1011,8 @@
 
             const owned = game.inventory[game.activeContract.oreId] || 0;
             if (owned >= game.activeContract.requiredAmount) {
-                // Deduct ore
                 game.inventory[game.activeContract.oreId] -= game.activeContract.requiredAmount;
 
-                // Find ore baseline value
                 let baseVal = 1;
                 ORE_TIERS.forEach(t => t.ores.forEach(o => {
                     if (o.id === game.activeContract.oreId) baseVal = o.value;
@@ -935,12 +1021,12 @@
                 const totalValue = baseVal * game.activeContract.requiredAmount * game.marketMultiplier * game.activeContract.bonusMultiplier * game.prestigeMultipliers.cashMult;
                 
                 addCash(totalValue);
-                logDrop(`CONTRACT FULFILLED! Earned ${formatMoney(totalValue)}`, "#f59e0b");
+                logDrop(`CONTRACT FULFILLED! Earned ${formatMoney(totalValue)}`, "#006600");
 
                 generateNewContract();
                 renderInventoryGrid();
             } else {
-                logDrop(`Contract failed: Missing required items`, "#f43f5e");
+                logDrop(`Contract failed: Missing required items`, "#cc0000");
             }
         }
 
@@ -956,7 +1042,6 @@
                 if (o.id === oreId) baseVal = o.value;
             }));
 
-            // Calculate selling value formula
             const purityLvl = game.upgrades["l_purity"] || 0;
             const purityMult = UPGRADE_DEFINITIONS.find(u => u.id === "l_purity").effect(purityLvl);
             
@@ -992,9 +1077,92 @@
                 game.totalOresSold += itemsSold;
                 addCash(totalEarned);
                 if (!silent) {
-                    logDrop(`Liquidated ${itemsSold} ores for ${formatMoney(totalEarned)}`, "#10b981");
+                    logDrop(`Liquidated ${itemsSold} ores for ${formatMoney(totalEarned)}`, "#006600");
                 }
                 renderInventoryGrid();
+            }
+        }
+
+        function buyUpgrade(upgId) {
+            const upg = UPGRADE_DEFINITIONS.find(u => u.id === upgId);
+            if (!upg) return;
+
+            const currentLvl = game.upgrades[upg.id] || 0;
+            if (currentLvl >= upg.maxLvl) return;
+
+            const cost = Math.floor(upg.baseCost * Math.pow(upg.costMult, currentLvl));
+            if (game.cash >= cost) {
+                game.cash -= cost;
+                game.upgrades[upg.id] = currentLvl + 1;
+                recalculateStats();
+                renderUpgradesGrid(upg.cat);
+                updateUIHUD();
+                logDrop(`Purchased upgrade: ${upg.name} (Level ${game.upgrades[upg.id]})`, "#000000");
+            }
+        }
+
+        function buyPrestigePerk(perkId) {
+            const perk = PRESTIGE_PERKS.find(p => p.id === perkId);
+            if (!perk) return;
+
+            const currentLvl = game.prestigePerks[perk.id] || 0;
+            if (currentLvl >= perk.maxLvl) return;
+
+            const cost = Math.floor(perk.baseCost * Math.pow(perk.costMult, currentLvl));
+            if (game.prestigeTokens >= cost) {
+                game.prestigeTokens -= cost;
+                game.prestigePerks[perk.id] = currentLvl + 1;
+                recalculateStats();
+                renderPrestigeTab();
+                updateUIHUD();
+                logDrop(`Purchased Transcendent Perk: ${perk.name}`, "#0000b3");
+            }
+        }
+
+        function drillDeeper() {
+            const nextTierObj = ORE_TIERS[game.unlockedTier];
+            if (!nextTierObj) return;
+
+            if (game.cash >= nextTierObj.costToUnlock) {
+                game.cash -= nextTierObj.costToUnlock;
+                game.unlockedTier++;
+                game.depthMeters = nextTierObj.depthMeters;
+                
+                renderDepthTab();
+                updateUIHUD();
+                logDrop(`SUCCESS! Drilled down to Depth Strata Tier ${game.unlockedTier}: ${nextTierObj.name}`, "#0000b3");
+            }
+        }
+
+        function calculatePendingPrestigeTokens() {
+            if (game.totalCashEarned < 100000) return 0;
+            return Math.floor(Math.pow(game.totalCashEarned / 100000, 0.25));
+        }
+
+        function performPrestigeReset() {
+            const pending = calculatePendingPrestigeTokens();
+            if (pending <= 0) {
+                alert("You need at least $100,000 all-time earnings to gain Ascension Points.");
+                return;
+            }
+
+            if (confirm(`Ascend facility now? Reset cash and standard upgrades to gain ${pending} AP?`)) {
+                game.prestigeTokens += pending;
+                game.totalPrestigeResets++;
+
+                // Reset standard stats
+                game.cash = 0;
+                game.unlockedTier = 1;
+                game.depthMeters = 1;
+                game.minersCount = 1;
+                game.inventory = {};
+                game.upgrades = {};
+                game.minerInstances = [];
+
+                initData();
+                renderMinersGrid();
+                updateUIHUD();
+                logDrop(`FACILITY ASCENDED! Granted ${pending} Ascension Tokens!`, "#0000b3");
             }
         }
 
@@ -1006,7 +1174,7 @@
         /* --- UI RENDERING & LOGIC --- */
         function updateUIHUD() {
             document.getElementById("hud-cash").textContent = formatMoney(game.cash);
-            document.getElementById("hud-miners").textContent = `${game.minersCount} / ${game.minerMaxSlots} Miners`;
+            document.getElementById("hud-miners").textContent = `${game.minersCount} / ${game.minerMaxSlots}`;
             document.getElementById("hud-depth").textContent = `${formatNumber(game.depthMeters)}m (Tier ${game.unlockedTier})`;
             
             const prestigeContainer = document.getElementById("hud-prestige-container");
@@ -1025,7 +1193,7 @@
             document.getElementById("rig-stat-speed").textContent = `${(game.minerBaseSpeed / game.minerSpeedMult).toFixed(2)}s`;
             document.getElementById("rig-stat-multi").textContent = `${(game.minerMultiOreChance * 100).toFixed(0)}%`;
             document.getElementById("rig-stat-luck").textContent = `${game.luckMultiplier.toFixed(2)}x`;
-            document.getElementById("rig-slots-label").textContent = `Active Slots: ${game.minersCount} / ${game.minerMaxSlots}`;
+            document.getElementById("rig-slots-label").textContent = `${game.minersCount} / ${game.minerMaxSlots}`;
 
             // Calculate pending ascension tokens
             const pendingTokens = calculatePendingPrestigeTokens();
@@ -1037,18 +1205,13 @@
             const tabBtns = document.querySelectorAll(".tab-btn");
             tabBtns.forEach(btn => {
                 btn.addEventListener("click", () => {
-                    tabBtns.forEach(b => {
-                        b.classList.remove("active", "bg-slate-700/80", "text-white");
-                        b.classList.add("text-slate-400");
-                    });
-                    btn.classList.add("active", "bg-slate-700/80", "text-white");
-                    btn.classList.remove("text-slate-400");
+                    tabBtns.forEach(b => b.classList.remove("active"));
+                    btn.classList.add("active");
 
                     const targetTab = btn.getAttribute("data-tab");
                     document.querySelectorAll(".tab-content").forEach(c => c.classList.add("hidden"));
                     document.getElementById(targetTab).classList.remove("hidden");
 
-                    // Trigger render updates for tab contents
                     if (targetTab === "tab-inventory") renderInventoryGrid();
                     if (targetTab === "tab-upgrades") renderUpgradesGrid("mining");
                     if (targetTab === "tab-depth") renderDepthTab();
@@ -1057,15 +1220,11 @@
                 });
             });
 
-            // MANUAL MINE BUTTON
-            document.getElementById("btn-manual-mine").addEventListener("click", () => {
-                const manualLvl = game.upgrades["m_manual"] || 0;
-                const count = UPGRADE_DEFINITIONS.find(u => u.id === "m_manual").effect(manualLvl);
-                
-                for (let i = 0; i < count; i++) {
-                    const ore = generateRock();
-                    breakRock(ore);
-                }
+            // POWER OUTAGE RESTORE BUTTON
+            document.getElementById("btn-fix-power")?.addEventListener("click", () => {
+                game.powerOutageActive = false;
+                document.getElementById("power-outage-banner").classList.add("hidden");
+                logDrop("Power restored to miner deck.", "#006600");
             });
 
             // BUY MINER SLOT / MINER PURCHASING
@@ -1084,7 +1243,7 @@
                 const autoSellUnlocked = (game.upgrades["a_autosell"] || 0) > 0;
                 if (!autoSellUnlocked) {
                     e.target.checked = false;
-                    logDrop("Auto-Seller locked! Purchase in Upgrades tab.", "#f43f5e");
+                    logDrop("Auto-Seller locked! Purchase in Upgrades tab.", "#cc0000");
                     return;
                 }
                 game.autoSellEnabled = e.target.checked;
@@ -1093,10 +1252,8 @@
             // UPGRADES CATEGORY TABS
             document.querySelectorAll(".upg-cat-btn").forEach(btn => {
                 btn.addEventListener("click", () => {
-                    document.querySelectorAll(".upg-cat-btn").forEach(b => {
-                        b.className = "upg-cat-btn px-4 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 text-slate-400 border border-transparent hover:bg-slate-700";
-                    });
-                    btn.className = "upg-cat-btn px-4 py-1.5 rounded-lg text-xs font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/30";
+                    document.querySelectorAll(".upg-cat-btn").forEach(b => b.classList.remove("active"));
+                    btn.classList.add("active");
                     renderUpgradesGrid(btn.getAttribute("data-upgrade-cat"));
                 });
             });
@@ -1118,7 +1275,7 @@
             // SAVE & RESET BUTTONS
             document.getElementById("btn-save").addEventListener("click", () => {
                 saveGame();
-                logDrop("Game manually saved.", "#38bdf8");
+                logDrop("Game manually saved.", "#0645ad");
             });
             document.getElementById("btn-manual-save").addEventListener("click", saveGame);
             document.getElementById("btn-export-save").addEventListener("click", exportSave);
@@ -1134,117 +1291,6 @@
             renderUpgradesGrid("mining");
         }
 
-        /* --- RENDER FUNCTIONS --- */
-        function renderMinersGrid() {
-            const grid = document.getElementById("miners-grid");
-            grid.innerHTML = "";
-
-            syncMinerInstances();
-
-            for (let i = 0; i < game.minerMaxSlots; i++) {
-                const isActive = i < game.minersCount;
-                const card = document.createElement("div");
-                card.className = `border rounded-xl p-4 flex flex-col justify-between transition ${isActive ? 'bg-slate-800/80 border-slate-700' : 'bg-slate-900/40 border-slate-800 opacity-60'}`;
-
-                if (isActive) {
-                    const instance = game.minerInstances[i];
-                    card.innerHTML = `
-                        <div>
-                            <div class="flex items-center justify-between mb-2">
-                                <div class="flex items-center space-x-2">
-                                    <i class="fa-solid fa-robot text-amber-400 text-sm"></i>
-                                    <span class="font-bold text-xs text-slate-200">Miner Rig #${i + 1}</span>
-                                </div>
-                                <span class="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">ACTIVE</span>
-                            </div>
-                            <div class="text-xs text-slate-400 mb-3 flex justify-between">
-                                <span>Mining Target:</span>
-                                <strong id="miner-rock-name-${i}" style="color: ${instance.currentRock.color}">${instance.currentRock.name}</strong>
-                            </div>
-                        </div>
-                        <div class="space-y-1">
-                            <div class="w-full bg-slate-900 h-2 rounded-full overflow-hidden border border-slate-700">
-                                <div id="miner-progress-${i}" class="bg-amber-500 h-full progress-bar" style="width: 0%"></div>
-                            </div>
-                        </div>
-                    `;
-                } else {
-                    const minerBuyCost = Math.floor(100 * Math.pow(2.8, game.minersCount));
-                    card.innerHTML = `
-                        <div class="text-center py-4 space-y-2">
-                            <i class="fa-solid fa-lock text-slate-600 text-xl"></i>
-                            <div class="text-xs font-semibold text-slate-400">Locked Slot #${i + 1}</div>
-                            <button onclick="purchaseMiner(${minerBuyCost})" class="py-1.5 px-3 bg-amber-600/80 hover:bg-amber-500 text-slate-950 font-bold text-xs rounded transition mt-2">
-                                ACTIVATE MINER (${formatMoney(minerBuyCost)})
-                            </button>
-                        </div>
-                    `;
-                }
-                grid.appendChild(card);
-            }
-        }
-
-        function purchaseMiner(cost) {
-            if (game.cash >= cost && game.minersCount < game.minerMaxSlots) {
-                game.cash -= cost;
-                game.minersCount++;
-                syncMinerInstances();
-                renderMinersGrid();
-                updateUIHUD();
-                logDrop(`Purchased Auto Miner Rig #${game.minersCount}!`, "#f59e0b");
-            } else if (game.cash < cost) {
-                logDrop("Insufficient funds to activate miner slot.", "#f43f5e");
-            }
-        }
-
-        function renderInventoryGrid() {
-            const grid = document.getElementById("ore-inventory-grid");
-            if (!grid) return;
-
-            grid.innerHTML = "";
-            let totalStored = 0;
-
-            const searchQuery = (document.getElementById("inventory-search")?.value || "").toLowerCase();
-
-            ORE_TIERS.forEach(tier => {
-                tier.ores.forEach(ore => {
-                    const count = game.inventory[ore.id] || 0;
-                    totalStored += count;
-
-                    if (searchQuery && !ore.name.toLowerCase().includes(searchQuery) && !tier.name.toLowerCase().includes(searchQuery)) {
-                        return;
-                    }
-
-                    if (count === 0 && document.getElementById("btn-filter-owned")?.classList.contains("active")) {
-                        return;
-                    }
-
-                    const card = document.createElement("div");
-                    card.className = `bg-slate-800/60 border border-slate-700/60 rounded-xl p-3 flex flex-col justify-between transition ${count > 0 ? 'opacity-100' : 'opacity-40'}`;
-                    
-                    const oreValueCalculated = ore.value * game.marketMultiplier * (1 + game.biddingNegotiationBonus) * game.prestigeMultipliers.cashMult;
-
-                    card.innerHTML = `
-                        <div>
-                            <div class="flex items-center justify-between mb-1">
-                                <span class="text-[10px] uppercase font-mono text-slate-400">Tier ${tier.tier}</span>
-                                <span class="font-mono text-xs font-bold" style="color: ${ore.color}">${count} Stored</span>
-                            </div>
-                            <div class="flex items-center space-x-2 mb-2">
-                                <i class="fa-solid ${ore.icon} text-base" style="color: ${ore.color}"></i>
-                                <span class="text-xs font-semibold text-slate-200">${ore.name}</span>
-                            </div>
-                            <div class="text-[11px] text-slate-400 font-mono mb-3">
-                                Value: <span class="text-emerald-400">${formatMoney(oreValueCalculated)}</span> / ea
-                            </div>
-                        </div>
-                        <div class="flex gap-1">
-                            <button onclick="sellOre('${ore.id}', 1)" ${count === 0 ? 'disabled' : ''} class="flex-1 py-1 px-2 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-slate-200 text-[11px] rounded transition">
-                                Sell 1
-                            </button>
-                            <button onclick="sellOre('${ore.id}', null)" ${count === 0 ? 'disabled' : ''} class="flex-1 py-1 px-2 bg-emerald-600/80 hover:bg-emerald-500 disabled:opacity-50 text-slate-950 font-bold text-[11px] rounded transition">
-                                Sell All
-                            </button>
         /* --- RENDER FUNCTIONS FOR CLASSIC WEB 1.0 DESIGN --- */
         function renderMinersGrid() {
             const grid = document.getElementById("miners-grid");
@@ -1255,6 +1301,7 @@
             for (let i = 0; i < game.minerMaxSlots; i++) {
                 const isActive = i < game.minersCount;
                 const card = document.createElement("div");
+                card.id = `miner-card-${i}`;
                 card.className = "infobox";
                 card.style.marginBottom = "10px";
 
@@ -1262,9 +1309,11 @@
                     const instance = game.minerInstances[i];
                     card.innerHTML = `
                         <div>
-                            <strong>Auto-Miner Rig #${i + 1}</strong> [Status: ACTIVE]
+                            <strong>Auto-Miner Rig #${i + 1}</strong> [Status: OPERATIONAL]
                             <br>
-                            Current Target Rock: <strong id="miner-rock-name-${i}">${instance.currentRock.name}</strong>
+                            Current Ore Target: <strong id="miner-rock-name-${i}">${instance.currentRock.name}</strong>
+                            <br>
+                            <span id="miner-status-${i}" class="miner-status-text">⏳ Phase 1/3: Scanning for Target...</span>
                             <div class="progress-container">
                                 <div id="miner-progress-${i}" class="progress-bar"></div>
                             </div>
@@ -1281,6 +1330,19 @@
                     `;
                 }
                 grid.appendChild(card);
+            }
+        }
+
+        function purchaseMiner(cost) {
+            if (game.cash >= cost && game.minersCount < game.minerMaxSlots) {
+                game.cash -= cost;
+                game.minersCount++;
+                syncMinerInstances();
+                renderMinersGrid();
+                updateUIHUD();
+                logDrop(`Purchased Auto Miner Rig #${game.minersCount}!`, "#006600");
+            } else if (game.cash < cost) {
+                logDrop("Insufficient funds to activate miner slot.", "#cc0000");
             }
         }
 
@@ -1374,7 +1436,6 @@
                 costText.textContent = "N/A";
             }
 
-            // Render strata map as classic table
             const strataContainer = document.getElementById("tier-strata-list");
             strataContainer.innerHTML = "";
 
@@ -1474,7 +1535,7 @@
         }
 
         /* --- LOGGING ACTIVITY --- */
-        function logDrop(msg, color = "#94a3b8") {
+        function logDrop(msg, color = "#000000") {
             const logContainer = document.getElementById("drop-log");
             if (!logContainer) return;
 
@@ -1496,7 +1557,7 @@
             const now = Date.now();
             const elapsedSeconds = Math.floor((now - parseInt(lastSaveTime)) / 1000);
 
-            if (elapsedSeconds > 30) { // Off for more than 30 seconds
+            if (elapsedSeconds > 30) {
                 const cycleSpeed = game.minerBaseSpeed / game.minerSpeedMult;
                 const totalCycles = Math.floor((elapsedSeconds / cycleSpeed) * game.minersCount);
 
@@ -1509,7 +1570,6 @@
                     estimatedRevenue *= (totalCycles / 1000);
                 }
 
-                // Apply market + multipliers
                 estimatedRevenue *= game.marketMultiplier * game.prestigeMultipliers.cashMult;
 
                 addCash(estimatedRevenue);
