@@ -240,9 +240,24 @@
             align-items: start;
         }
         #miners-grid .infobox { margin: 0 !important; min-width: 0; }
-        @media (max-width: 520px) {
-            #miners-grid { grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); }
-        }
+        @media (max-width: 520px) { #miners-grid { grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); } }
+        #automation-editor{border:1px solid #72777d;background:#20252b;color:#e8edf2;font-family:Arial,sans-serif}
+        #automation-toolbar{background:#f8f9fa;color:#222;border-bottom:1px solid #a2a9b1;padding:8px;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+        #automation-graph-viewport{height:590px;overflow:auto;position:relative;background-color:#222831;background-image:linear-gradient(rgba(255,255,255,.055) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.055) 1px,transparent 1px);background-size:24px 24px;touch-action:pan-x pan-y}
+        #automation-graph{position:relative;width:1200px;height:760px}
+        #automation-wires{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible}
+        .auto-wire{fill:none;stroke:#62c88a;stroke-width:3}
+        .auto-node{position:absolute;width:190px;background:#303943;border:1px solid #82909d;border-radius:5px;color:#f4f6f8;box-shadow:0 3px 9px #0008;z-index:2;user-select:none}
+        .auto-node.selected{outline:2px solid #f0c674}
+        .auto-node-head{padding:7px 9px;background:#414d59;border-bottom:1px solid #758391;cursor:grab;font-weight:bold;font-size:13px}
+        .auto-node-body{padding:8px;font-size:12px}.auto-node-body label{display:block;margin:5px 0}
+        .auto-pin-row{display:flex;justify-content:space-between;gap:10px;align-items:center;margin:5px 0;min-height:20px;font-size:11px;color:#d5dde5}
+        .auto-pin{width:13px;height:13px;padding:0;border-radius:50%;border:2px solid #d7e1eb;background:#27313b;cursor:pointer;margin:0 3px;flex:0 0 13px}
+        .auto-pin.output{background:#62c88a;border-color:#c7f4d8}.auto-pin.pending{background:#f0c674}
+        .auto-node small{color:#c1ccd6}.auto-node input[type=number],.auto-node select{max-width:90px}
+        #automation-inspector{background:#f8f9fa;color:#222;border-top:1px solid #a2a9b1;padding:8px;font-family:Arial,sans-serif}
+        #automation-graph-status{font-family:monospace;font-size:12px;padding:7px;color:#d5dde5}
+        @media(max-width:600px){#automation-graph-viewport{height:520px}}
     </style>
 </head>
 <body>
@@ -397,44 +412,25 @@
             </div>
 
             <div id="automation-control-panel" class="infobox">
-                <h3>Automation Control & Wiring Board</h3>
-                <p>Connect the production line to decide where mined material flows. Disconnected lines stop that stage of automation.</p>
-                <h4>Installable / Toggleable Modules</h4>
-                <p>Each module can be independently disabled. A module only works when its required wires are connected.</p>
-                <table class="wikitable">
-                    <tr><th>Module</th><th>Enabled</th><th>Purpose</th></tr>
-                    <tr><td>Ore Sorter</td><td><input type="checkbox" id="module-sorter" checked></td><td>Classifies incoming ore.</td></tr>
-                    <tr><td>Market Router</td><td><input type="checkbox" id="module-market" checked></td><td>Routes surplus to sales.</td></tr>
-                    <tr><td>Contract Terminal</td><td><input type="checkbox" id="module-contract" checked></td><td>Completes matching contracts.</td></tr>
-                    <tr><td>Storage Vault</td><td><input type="checkbox" id="module-vault" checked></td><td>Protects a per-ore reserve.</td></tr>
-                    <tr><td>Batch Buffer</td><td><input type="checkbox" id="module-buffer" checked></td><td>Reduces the minimum sale batch.</td></tr>
-                    <tr><td>Distribution Splitter</td><td><input type="checkbox" id="module-splitter" checked></td><td>Controls the share sent to market.</td></tr>
-                    <tr><td>Liquidation Relay</td><td><input type="checkbox" id="module-liquidator" checked></td><td>Turns routed ore into cash.</td></tr>
-                </table>
-                <h4>Patch-panel wiring</h4>
-                <table class="wikitable">
-                    <tr><th>Connection</th><th>Wire</th><th>Function</th></tr>
-                    <tr><td>Miner Bus → Ore Sorter</td><td><input type="checkbox" id="wire-miner-sorter" checked></td><td>Feeds automation.</td></tr>
-                    <tr><td>Ore Sorter → Market Router</td><td><input type="checkbox" id="wire-sorter-market" checked></td><td>Direct market route.</td></tr>
-                    <tr><td>Ore Sorter → Contract Terminal</td><td><input type="checkbox" id="wire-sorter-contract" checked></td><td>Contract route.</td></tr>
-                    <tr><td>Ore Sorter → Storage Vault</td><td><input type="checkbox" id="wire-sorter-vault" checked></td><td>Reserve route.</td></tr>
-                    <tr><td>Ore Sorter → Batch Buffer</td><td><input type="checkbox" id="wire-sorter-buffer" checked></td><td>Queues material.</td></tr>
-                    <tr><td>Ore Sorter → Distribution Splitter</td><td><input type="checkbox" id="wire-sorter-splitter" checked></td><td>Enables split routing.</td></tr>
-                    <tr><td>Distribution Splitter → Market Router</td><td><input type="checkbox" id="wire-splitter-market" checked></td><td>Market share route.</td></tr>
-                    <tr><td>Distribution Splitter → Storage Vault</td><td><input type="checkbox" id="wire-splitter-vault" checked></td><td>Retained share route.</td></tr>
-                    <tr><td>Market Router → Liquidation Relay</td><td><input type="checkbox" id="wire-market-liquidator" checked></td><td>Executes sales.</td></tr>
-                </table>
-                <p><label>Routing policy:
-                    <select id="automation-policy">
-                        <option value="balanced">Balanced (contracts first, then sell surplus)</option>
-                        <option value="sell">Sell surplus first</option>
-                        <option value="stockpile">Stockpile (do not auto-sell)</option>
-                    </select>
-                </label></p>
-                <p><label>Reserve per ore type: <input type="number" id="automation-reserve" min="0" max="1000000" value="0" style="width:90px"></label>
-                <label>Minimum sale batch: <input type="number" id="automation-batch" min="1" max="1000000" value="1" style="width:90px"></label></p>
-                <p><label>Market share: <input type="range" id="automation-market-share" min="0" max="100" step="5" value="100"></label> <strong><span id="automation-market-share-value">100%</span></strong></p>
-                <p><strong>Line status:</strong> <span id="automation-line-status">All connections active.</span></p>
+                <h3>Visual Automation Workshop</h3>
+                <p>Build an automation program by connecting machine nodes. Click a green output pin, then a white input pin. Drag node headers to arrange your system. Your graph is saved with your game.</p>
+                <div id="automation-editor">
+                    <div id="automation-toolbar"><strong>Node palette:</strong>
+                        <select id="automation-add-type">
+                            <option value="sorter">Ore Sorter</option><option value="filter">Ore Filter</option><option value="splitter">Distribution Splitter</option>
+                            <option value="buffer">Batch Buffer</option><option value="storage">Storage Vault</option><option value="market">Market Router</option>
+                            <option value="sell">Sell Ore</option><option value="contract">Contract Terminal</option>
+                        </select>
+                        <button id="automation-add-node">Add Node</button><button id="automation-clear-link">Cancel Connection</button><button id="automation-reset-graph">Reset Example Graph</button>
+                    </div>
+                    <div id="automation-graph-viewport"><div id="automation-graph"><svg id="automation-wires" viewBox="0 0 1200 760" aria-hidden="true"></svg></div></div>
+                    <div id="automation-inspector"><strong>Node details:</strong> <span id="automation-inspector-content">Select a node to inspect its settings.</span></div>
+                    <div id="automation-graph-status">Connect Miner Output → Ore Sorter → Market Router → Sell Ore.</div>
+                </div>
+                <p><strong>Global settings:</strong>
+                    <label>Policy <select id="automation-policy"><option value="balanced">Balanced</option><option value="sell">Sell surplus first</option><option value="stockpile">Stockpile only</option></select></label>
+                    <label>Power priority <select id="power-priority"><option value="miners">Mining first</option><option value="automation">Automation first</option><option value="contracts">Contracts first</option></select></label>
+                </p>
             </div>
         </div>
 
@@ -728,12 +724,7 @@
             powerStability: 0,
             powerGrid: { priority: "miners" },
             powerRatios: { miners: 1, automation: 1, contracts: 1 },
-            automation: {
-                wires: { minerSorter:true, sorterMarket:true, sorterContract:true, sorterVault:true, marketLiquidator:true,
-                    sorterBuffer:true, sorterSplitter:true, splitterMarket:true, splitterVault:true },
-                modules: { sorter:true, market:true, contract:true, vault:true, buffer:true, splitter:true, liquidator:true },
-                policy:"balanced", reserve:0, minBatch:1, marketShare:100
-            },
+            automation: { graph:null, policy:"balanced", reserve:0, minBatch:1, marketShare:100 },
 
             // Luck & Quality
             luckMultiplier: 1.0,
@@ -963,12 +954,8 @@
         function calculatePowerAllocation() {
             const generated = (10 + (game.upgrades["p_generator"] || 0) * 8) * Math.pow(1.10, game.upgrades["p_overdrive"] || 0);
             const modules = game.automation?.modules || {}, wires = game.automation?.wires || {};
-            const splitPath = modules.splitter !== false && wires.sorterSplitter !== false && wires.splitterMarket !== false;
-            const marketRoute = wires.sorterMarket !== false || splitPath;
-            const autoPath = game.autoSellEnabled && modules.sorter !== false && modules.market !== false && modules.liquidator !== false &&
-                wires.minerSorter !== false && marketRoute && wires.marketLiquidator !== false && game.automation?.policy !== "stockpile";
-            const contractPath = (game.upgrades["a_contract_auto"] || 0) > 0 && modules.sorter !== false && modules.contract !== false &&
-                wires.minerSorter !== false && wires.sorterContract !== false && game.automation?.policy === "balanced";
+            const autoPath = game.autoSellEnabled && automationHasPath("miners","sell") && game.automation?.policy !== "stockpile";
+            const contractPath = (game.upgrades["a_contract_auto"] || 0) > 0 && automationHasPath("miners","contract") && game.automation?.policy === "balanced";
             const demandByType = { miners: game.minersCount * 6, automation: autoPath ? 3 : 0, contracts: contractPath ? 2 : 0 };
             const efficiency = 1 + Math.min(0.25, (game.upgrades["p_stabilizer"] || 0) * 0.0125);
             let available = generated;
@@ -1060,9 +1047,7 @@
 
             // Auto fulfill contract check
             const contractAuto = game.upgrades["a_contract_auto"] || 0;
-            const contractWireConnected = game.automation?.wires?.minerSorter !== false &&
-                game.automation?.wires?.sorterContract !== false &&
-                game.automation?.modules?.sorter !== false && game.automation?.modules?.contract !== false;
+            const contractWireConnected = automationHasPath("miners","contract");
             const contractPriorityEnabled = (game.automation?.policy || "balanced") === "balanced";
             if (contractAuto > 0 && contractWireConnected && contractPriorityEnabled &&
                 (game.powerRatios?.contracts ?? 1) >= 0.99 && game.activeContract) {
@@ -1076,93 +1061,92 @@
 
         let autoSellAccumulator = 0;
         function autoSellTick(dt) {
-            const w = game.automation?.wires || {}, m = game.automation?.modules || {};
-            const split = m.splitter !== false && w.sorterSplitter !== false && w.splitterMarket !== false;
-            if (m.sorter === false || m.market === false || m.liquidator === false || !w.minerSorter ||
-                (!w.sorterMarket && !split) || !w.marketLiquidator || game.automation?.policy === "stockpile") return;
+            if (!automationHasPath("miners","sell") || game.automation?.policy === "stockpile") return;
             autoSellAccumulator += dt;
-            const interval = UPGRADE_DEFINITIONS.find(u => u.id === "a_quick_sell").effect(game.upgrades["a_quick_sell"] || 0);
-            if (autoSellAccumulator >= interval) {
-                autoSellAccumulator = 0;
-                const vault = m.vault !== false && (w.sorterVault !== false || (split && w.splitterVault !== false));
-                const reserve = vault ? Math.max(0, Number(game.automation?.reserve) || 0) : 0;
-                const buffered = m.buffer !== false && w.sorterBuffer !== false;
-                const reduction = buffered ? UPGRADE_DEFINITIONS.find(u => u.id === "a_buffer").effect(game.upgrades["a_buffer"] || 0) : 0;
-                const batch = Math.max(1, (Number(game.automation?.minBatch) || 1) - reduction);
-                const share = split ? Math.max(0, Math.min(100, Number(game.automation?.marketShare ?? 100))) / 100 : 1;
-                let count = 0;
-                ORE_TIERS.forEach(t => t.ores.forEach(o => count += Math.floor(Math.max(0,(game.inventory[o.id]||0)-reserve)*share)));
-                if (count >= batch) sellAllInventory(true, true, share);
+            const interval=UPGRADE_DEFINITIONS.find(u=>u.id==="a_quick_sell").effect(game.upgrades["a_quick_sell"]||0);
+            if(autoSellAccumulator>=interval){
+                autoSellAccumulator=0;const nodes=ensureAutomationGraph().nodes;
+                const vault=nodes.find(n=>n.type==="storage"&&automationHasPath("sorter",n.id));
+                const buffer=nodes.find(n=>n.type==="buffer"&&automationHasPath("sorter",n.id)&&automationHasPath(n.id,"sell"));
+                const splitter=nodes.find(n=>n.type==="splitter"&&automationHasPath("sorter",n.id)&&automationHasPath(n.id,"sell"));
+                const reserve=vault?Math.max(0,Number(vault.reserve??game.automation.reserve)||0):0;
+                const reduction=buffer?UPGRADE_DEFINITIONS.find(u=>u.id==="a_buffer").effect(game.upgrades["a_buffer"]||0):0;
+                const batch=Math.max(1,(Number(buffer?.threshold??game.automation.minBatch)||1)-reduction);
+                const share=splitter?Math.max(0,Math.min(100,Number(splitter.share??50)))/100:1;
+                let count=0;ORE_TIERS.forEach(t=>t.ores.forEach(o=>count+=Math.floor(Math.max(0,(game.inventory[o.id]||0)-reserve)*share)));
+                if(count>=batch)sellAllInventory(true,true,share);
             }
         }
 
-        function setupAutomationControls() {
-            if (!game.automation) game.automation = {
-                wires: { minerSorter:true, sorterMarket:true, sorterContract:true, sorterVault:true, marketLiquidator:true },
-                policy:"balanced", reserve:0, minBatch:1
-            };
-            if (!game.automation.wires) game.automation.wires = {};
-            const wireMap = {
-                "wire-miner-sorter":"minerSorter", "wire-sorter-market":"sorterMarket",
-                "wire-sorter-contract":"sorterContract", "wire-sorter-vault":"sorterVault",
-                "wire-market-liquidator":"marketLiquidator", "wire-sorter-buffer":"sorterBuffer",
-                "wire-sorter-splitter":"sorterSplitter", "wire-splitter-market":"splitterMarket",
-                "wire-splitter-vault":"splitterVault"
-            };
-            Object.entries(wireMap).forEach(([elementId,key]) => {
-                const el = document.getElementById(elementId);
-                if (!el) return;
-                el.checked = game.automation.wires[key] !== false;
-                el.addEventListener("change", () => {
-                    game.automation.wires[key] = el.checked;
-                    updateAutomationLineStatus();
-                    saveGame();
+        const AUTOMATION_NODE_TYPES = {
+            miners:{name:"Miner Output",inputs:[],outputs:["Ore stream"],desc:"Starting point for extracted ore."},
+            sorter:{name:"Ore Sorter",inputs:["Ore input"],outputs:["Sorted ore"],desc:"Classifies incoming ore."},
+            filter:{name:"Ore Filter",inputs:["Ore input"],outputs:["Match","Other"],desc:"Splits matching ore from everything else."},
+            splitter:{name:"Distribution Splitter",inputs:["Ore input"],outputs:["Market share","Retained share"],desc:"Splits material into two branches."},
+            buffer:{name:"Batch Buffer",inputs:["Ore input"],outputs:["Batch output"],desc:"Waits for a minimum batch."},
+            storage:{name:"Storage Vault",inputs:["Ore input"],outputs:["Stored ore"],desc:"Keeps a reserve from liquidation."},
+            market:{name:"Market Router",inputs:["Ore input"],outputs:["Sale route"],desc:"Routes material to the market."},
+            sell:{name:"Sell Ore",inputs:["Ore input"],outputs:[],desc:"Liquidates material reaching this node."},
+            contract:{name:"Contract Terminal",inputs:["Ore input"],outputs:["Remainder"],desc:"Feeds eligible ore into buyer contracts."}
+        };
+        function defaultAutomationGraph(){return {nodes:[
+            {id:"miners",type:"miners",x:35,y:100},{id:"sorter",type:"sorter",x:285,y:100},{id:"market",type:"market",x:555,y:70},
+            {id:"sell",type:"sell",x:850,y:70},{id:"storage",type:"storage",x:555,y:300},{id:"contract",type:"contract",x:850,y:300}
+        ],links:[{from:"miners",to:"sorter",out:0,input:0},{from:"sorter",to:"market",out:0,input:0},{from:"market",to:"sell",out:0,input:0},{from:"sorter",to:"storage",out:0,input:0},{from:"sorter",to:"contract",out:0,input:0}]};}
+        function ensureAutomationGraph(){if(!game.automation)game.automation={};if(!game.automation.graph||!Array.isArray(game.automation.graph.nodes))game.automation.graph=defaultAutomationGraph();return game.automation.graph;}
+        function automationHasPath(from,to){const g=ensureAutomationGraph(),seen=new Set([from]),q=[from];while(q.length){const id=q.shift();if(id===to)return true;g.links.filter(l=>l.from===id).forEach(l=>{if(!seen.has(l.to)){seen.add(l.to);q.push(l.to);}});}return false;}
+        function automationNode(id){return ensureAutomationGraph().nodes.find(n=>n.id===id);}
+        function setupAutomationControls(){
+            ensureAutomationGraph();
+            const priority=document.getElementById("power-priority"),policy=document.getElementById("automation-policy");
+            if(priority){priority.value=game.powerGrid?.priority||"miners";priority.addEventListener("change",()=>{game.powerGrid.priority=priority.value;saveGame();});}
+            if(policy){policy.value=game.automation.policy||"balanced";policy.addEventListener("change",()=>{game.automation.policy=policy.value;saveGame();});}
+            setupAutomationGraph();
+        }
+        let automationPendingOutput=null,automationSelectedNode=null,automationNodeCounter=0;
+        function setupAutomationGraph(){
+            document.getElementById("automation-add-node")?.addEventListener("click",()=>{const type=document.getElementById("automation-add-type").value,g=ensureAutomationGraph(),id=type+"_"+(++automationNodeCounter);g.nodes.push({id:id,type:type,x:35+(g.nodes.length%4)*255,y:440+Math.floor(g.nodes.length/4)*120,share:50,threshold:10,reserve:100,tier:1});automationSelectedNode=id;automationSaveGraph();});
+            document.getElementById("automation-clear-link")?.addEventListener("click",()=>{automationPendingOutput=null;renderAutomationGraph();});
+            document.getElementById("automation-reset-graph")?.addEventListener("click",()=>{if(confirm("Replace your current graph with the example layout?")){game.automation.graph=defaultAutomationGraph();automationPendingOutput=null;automationSaveGraph();}});
+            renderAutomationGraph();
+        }
+        function automationSaveGraph(){saveGame();renderAutomationGraph();}
+        function renderAutomationGraph(){
+            const root=document.getElementById("automation-graph");if(!root)return;const g=ensureAutomationGraph(),svg=document.getElementById("automation-wires");
+            root.querySelectorAll(".auto-node").forEach(n=>n.remove());svg.innerHTML="";
+            g.links.forEach(l=>{const a=automationNode(l.from),b=automationNode(l.to);if(!a||!b)return;const p=document.createElementNS("http://www.w3.org/2000/svg","path"),ax=a.x+190,ay=a.y+70+(l.out||0)*22,bx=b.x,by=b.y+70+(l.input||0)*22;p.setAttribute("d","M "+ax+" "+ay+" C "+(ax+65)+" "+ay+", "+(bx-65)+" "+by+", "+bx+" "+by);p.setAttribute("class","auto-wire");svg.appendChild(p);});
+            g.nodes.forEach(node=>{
+                const spec=AUTOMATION_NODE_TYPES[node.type];if(!spec)return;const el=document.createElement("div");el.className="auto-node"+(automationSelectedNode===node.id?" selected":"");el.style.left=node.x+"px";el.style.top=node.y+"px";
+                let html='<div class="auto-node-head">'+spec.name+' <small>· '+node.id+'</small></div><div class="auto-node-body"><div>'+spec.desc+'</div>';
+                spec.inputs.forEach((name,i)=>{html+='<div class="auto-pin-row"><button class="auto-pin input" data-pin="in" data-index="'+i+'"></button><span>'+name+'</span></div>';});
+                spec.outputs.forEach((name,i)=>{html+='<div class="auto-pin-row"><span>'+name+'</span><button class="auto-pin output '+(automationPendingOutput?.node===node.id&&automationPendingOutput?.index===i?"pending":"")+'" data-pin="out" data-index="'+i+'"></button></div>';});
+                if(node.type==="splitter")html+='<label>Market share % <input data-config="share" type="number" min="0" max="100" value="'+(node.share??50)+'"></label>';
+                if(node.type==="buffer")html+='<label>Batch size <input data-config="threshold" type="number" min="1" value="'+(node.threshold??10)+'"></label>';
+                if(node.type==="storage")html+='<label>Reserve <input data-config="reserve" type="number" min="0" value="'+(node.reserve??100)+'"></label>';
+                if(node.type==="filter"){html+='<label>Ore tier <select data-config="tier">';ORE_TIERS.forEach(t=>{html+='<option value="'+t.tier+'" '+(Number(node.tier||1)===t.tier?"selected":"")+' >Tier '+t.tier+'</option>';});html+='</select></label>';}
+                html+='<div style="text-align:right"><button data-delete-node="'+node.id+'" '+(node.type==="miners"?"disabled":"")+'>Remove</button></div></div>';el.innerHTML=html;
+                el.addEventListener("click",e=>{
+                    const pin=e.target.closest("[data-pin]");
+                    if(pin){e.stopPropagation();const index=Number(pin.dataset.index);if(pin.dataset.pin==="out"){automationPendingOutput={node:node.id,index:index};renderAutomationGraph();}
+                    else if(automationPendingOutput&&automationPendingOutput.node!==node.id){const exists=g.links.some(l=>l.from===automationPendingOutput.node&&l.to===node.id&&l.input===index);if(!exists)g.links.push({from:automationPendingOutput.node,to:node.id,out:automationPendingOutput.index,input:index});automationPendingOutput=null;automationSaveGraph();}
+                    else{automationPendingOutput=null;renderAutomationGraph();}return;}
+                    if(e.target.closest("[data-delete-node]")){g.links=g.links.filter(l=>l.from!==node.id&&l.to!==node.id);g.nodes=g.nodes.filter(n=>n.id!==node.id);automationSelectedNode=null;automationSaveGraph();return;}
+                    if(e.target.matches("[data-config]"))return;automationSelectedNode=node.id;renderAutomationInspector(node);renderAutomationGraph();
                 });
+                el.querySelectorAll("[data-config]").forEach(input=>input.addEventListener("change",()=>{node[input.dataset.config]=Number(input.value);saveGame();renderAutomationInspector(node);}));
+                const head=el.querySelector(".auto-node-head");let drag=null;
+                head.addEventListener("pointerdown",e=>{drag={x:e.clientX,y:e.clientY,nx:node.x,ny:node.y};head.setPointerCapture(e.pointerId);});
+                head.addEventListener("pointermove",e=>{if(!drag)return;node.x=Math.max(0,drag.nx+e.clientX-drag.x);node.y=Math.max(0,drag.ny+e.clientY-drag.y);el.style.left=node.x+"px";el.style.top=node.y+"px";renderAutomationWiresOnly();});
+                head.addEventListener("pointerup",()=>{if(drag){drag=null;saveGame();}});
+                root.appendChild(el);
             });
-            if (!game.automation.modules) game.automation.modules = {};
-            const moduleMap = { "module-sorter":"sorter", "module-market":"market", "module-contract":"contract", "module-vault":"vault", "module-buffer":"buffer", "module-splitter":"splitter", "module-liquidator":"liquidator" };
-            Object.entries(moduleMap).forEach(([id,key]) => {
-                const el = document.getElementById(id); if (!el) return;
-                el.checked = game.automation.modules[key] !== false;
-                el.addEventListener("change", () => { game.automation.modules[key] = el.checked; updateAutomationLineStatus(); saveGame(); });
-            });
-            const priority = document.getElementById("power-priority");
-            if (priority) { priority.value = game.powerGrid?.priority || "miners"; priority.addEventListener("change", () => { game.powerGrid.priority = priority.value; saveGame(); }); }
-            const share = document.getElementById("automation-market-share"), shareText = document.getElementById("automation-market-share-value");
-            if (share) { share.value = game.automation.marketShare ?? 100; if (shareText) shareText.textContent = share.value + "%"; share.addEventListener("input", () => { game.automation.marketShare = Number(share.value); if (shareText) shareText.textContent = share.value + "%"; saveGame(); }); }
-            const policy = document.getElementById("automation-policy");
-            const reserve = document.getElementById("automation-reserve");
-            const batch = document.getElementById("automation-batch");
-            if (policy) {
-                policy.value = game.automation.policy || "balanced";
-                policy.addEventListener("change", () => { game.automation.policy = policy.value; saveGame(); });
-            }
-            if (reserve) {
-                reserve.value = Math.max(0, game.automation.reserve || 0);
-                reserve.addEventListener("change", () => { game.automation.reserve = Math.max(0, Math.floor(Number(reserve.value) || 0)); reserve.value = game.automation.reserve; saveGame(); });
-            }
-            if (batch) {
-                batch.value = Math.max(1, game.automation.minBatch || 1);
-                batch.addEventListener("change", () => { game.automation.minBatch = Math.max(1, Math.floor(Number(batch.value) || 1)); batch.value = game.automation.minBatch; saveGame(); });
-            }
-            updateAutomationLineStatus();
+            renderAutomationInspector(automationNode(automationSelectedNode));
+            const status=document.getElementById("automation-graph-status");if(status)status.textContent=automationPendingOutput?"Choose an input pin to complete the wire.":automationHasPath("miners","sell")?"Active path: Miner Output → Sell Ore.":"No complete Miner Output → Sell Ore path; connect nodes to enable auto-selling.";
         }
+        function renderAutomationWiresOnly(){const svg=document.getElementById("automation-wires"),g=ensureAutomationGraph();svg.innerHTML="";g.links.forEach(l=>{const a=automationNode(l.from),b=automationNode(l.to);if(!a||!b)return;const p=document.createElementNS("http://www.w3.org/2000/svg","path"),ax=a.x+190,ay=a.y+70+(l.out||0)*22,bx=b.x,by=b.y+70+(l.input||0)*22;p.setAttribute("d","M "+ax+" "+ay+" C "+(ax+65)+" "+ay+", "+(bx-65)+" "+by+", "+bx+" "+by);p.setAttribute("class","auto-wire");svg.appendChild(p);});}
+        function renderAutomationInspector(node){const el=document.getElementById("automation-inspector-content");if(el)el.textContent=node?AUTOMATION_NODE_TYPES[node.type].name+": "+AUTOMATION_NODE_TYPES[node.type].desc:"Select a node to inspect its settings.";}
 
-        function updateAutomationLineStatus() {
-            const w = game.automation?.wires || {};
-            const status = document.getElementById("automation-line-status");
-            if (!status) return;
-            const missing = [];
-            if (!w.minerSorter) missing.push("Miner Bus → Ore Sorter");
-            if (!w.sorterMarket && !(w.sorterSplitter && w.splitterMarket)) missing.push("Sorter → Market route");
-            if (!w.marketLiquidator) missing.push("Market Router → Liquidation Relay");
-            if (!w.sorterContract) missing.push("Ore Sorter → Contract Terminal");
-            if (!w.sorterVault && !(w.sorterSplitter && w.splitterVault)) missing.push("Storage Vault route");
-            Object.entries(game.automation?.modules || {}).forEach(([k,v]) => { if (v === false) missing.push(k + " disabled"); });
-            status.textContent = missing.length ? "Routing changes: " + missing.join(", ") : "All modules and connections active.";
-        }
-
-        const MARKET_EVENTS = [
+                const MARKET_EVENTS = [
             { name: "Industrial Boom", description: "Factories are buying aggressively.", multiplier: 1.45 },
             { name: "Construction Rush", description: "Infrastructure demand boosts common metals.", multiplier: 1.30 },
             { name: "Gemstone Craze", description: "Collectors are paying more for rare minerals.", multiplier: 1.55 },
@@ -1895,9 +1879,7 @@
                 const parsed = JSON.parse(saved);
                 Object.assign(game, parsed);
                 if (!game.automation) game.automation = {};
-                if (!game.automation.wires) game.automation.wires = {};
-                if (!game.automation.modules) game.automation.modules = {};
-                if (game.automation.marketShare === undefined) game.automation.marketShare = 100;
+                if (!game.automation.graph) game.automation.graph = defaultAutomationGraph();
                 if (!game.powerGrid) game.powerGrid = { priority:"miners" };
                 recalculateStats();
             } catch (e) {
