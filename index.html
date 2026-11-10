@@ -925,7 +925,7 @@
             const rank=getCoreRank(),next=CORE_RANKS[rank],total=game.totalCoreEssenceEarned||0;
             let html='<p><strong>Current rank:</strong> '+(rank?('Rank '+CORE_RANKS[rank-1].title+' — '+CORE_RANKS[rank-1].name):'Unranked')+' · <strong>Lifetime Core Essence:</strong> '+formatNumber(total)+'</p>';
             if(next)html+='<p><strong>Next rank:</strong> '+next.title+' — '+next.name+' ('+formatNumber(Math.max(0,next.essence-total))+' more lifetime Essence required)</p>';
-            CORE_RANKS.forEach((r,i)=>{const earned=i<rank,progress=Math.min(100,total/r.essence*100);html+='<div class="core-rank-record '+(earned?'unlocked':'locked')+'"><strong>Rank '+r.title+' — '+r.name+'</strong> <span>'+(earned?'✓ Unlocked':'Locked')+'</span><p><strong>'+r.perk+'</strong> — '+r.effect+'</p><small>Unlock: '+(r.unlock||'Permanent rank perk')+'</small><div class="core-rank-progress"><span style="width:'+progress+'%"></span></div><small>'+formatNumber(Math.min(total,r.essence))+' / '+formatNumber(r.essence)+' lifetime Essence</small></div>';});
+            CORE_RANKS.forEach((r,i)=>{const earned=i<rank,progress=Math.min(100,total/r.essence*100);html+='<div class="core-rank-record '+(i===rank-1?'current':earned?'unlocked':'locked')+'"><strong>Rank '+r.title+' — '+r.name+'</strong> <span>'+(earned?'✓ Unlocked':'Locked')+'</span><p><strong>'+r.perk+'</strong> — '+r.effect+'</p><small>Unlock: '+(r.unlock||'Permanent rank perk')+'</small><div class="core-rank-progress"><span style="width:'+progress+'%"></span></div><small>'+formatNumber(Math.min(total,r.essence))+' / '+formatNumber(r.essence)+' lifetime Essence</small></div>';});
             root.innerHTML=html;
         }
 
@@ -1055,7 +1055,7 @@
 
         const POWER_PLANT_TYPES={solar:{name:"Solar Array",watts:14,cost:250,rank:0,mode:"passive",desc:"Daylight-dependent passive output."},solarFarm:{name:"Solar Farm",watts:75,cost:18000,rank:8,mode:"passive",desc:"Large passive solar array."},coal:{name:"Coal Generator",watts:42,cost:2200,rank:3,mode:"fuel",fuel:"coal",rate:.35,desc:"Consumes coal from inventory."},nuclear:{name:"Nuclear Plant",watts:180,cost:180000,rank:6,mode:"fuel",fuel:"uranium",rate:.08,desc:"Consumes uranium from inventory."},geothermal:{name:"Geothermal Station",watts:95,cost:95000,rank:10,mode:"passive",desc:"Stable passive output."},fusion:{name:"Fusion Reactor",watts:650,cost:2500000,rank:10,mode:"passive",desc:"Very high passive output."}};
         function powerPlantFuelAllowed(plant,id){
-            const nodes=ensureAutomationGraph().nodes.filter(n=>(n.type==="whitelist"||n.type==="blacklist")&&automationHasPath("miners",n.id)&&ensureAutomationGraph().links.some(l=>l.to===n.id));
+            const nodes=ensureAutomationGraph().nodes.filter(n=>(n.type==="whitelist"||n.type==="blacklist")&&automationNodeBound(n.id));
             const white=nodes.filter(n=>n.type==="whitelist"),black=nodes.filter(n=>n.type==="blacklist");
             if(white.length&&!white.some(n=>(n.oreId||"coal")===id))return false;
             if(black.some(n=>(n.oreId||"coal")===id))return false;
@@ -1082,7 +1082,7 @@ function setupPowerPlantControls(){
                 function calculatePowerAllocation() {
             const base=(10+(game.upgrades["p_generator"]||0)*8)*Math.pow(1.10,game.upgrades["p_overdrive"]||0)*coreRankBonuses().power;
             const generated=base+(game.powerPlantOutput||0),g=ensureAutomationGraph();
-            const connected=id=>automationHasPath("miners",id)&&g.links.some(l=>l.to===id);
+            const connected=id=>automationNodeBound(id);
             const autoPath=game.autoSellEnabled&&automationHasPath("miners","sell")&&game.automation?.policy!=="stockpile";
             const contractPath=(game.upgrades["a_contract_auto"]||0)>0&&automationHasPath("miners","contract")&&game.automation?.policy==="balanced";
             const activeNodes=g.nodes.filter(n=>n.type!=="miners"&&connected(n.id)&&((n.type!=="sell")||game.autoSellEnabled));
@@ -1225,6 +1225,7 @@ function setupPowerPlantControls(){
         function ensureAutomationGraph(){if(!game.automation)game.automation={};if(!game.automation.graph||!Array.isArray(game.automation.graph.nodes))game.automation.graph=defaultAutomationGraph();return game.automation.graph;}
         function automationHasPath(from,to){const g=ensureAutomationGraph(),seen=new Set([from]),q=[from];while(q.length){const id=q.shift();if(id===to)return true;g.links.filter(l=>l.from===id).forEach(l=>{if(!seen.has(l.to)){seen.add(l.to);q.push(l.to);}});}return false;}
         function automationNode(id){return ensureAutomationGraph().nodes.find(n=>n.id===id);}
+        function automationNodeBound(id){const g=ensureAutomationGraph(),n=automationNode(id);if(!n||n.type==="miners")return !!n;const incoming=g.links.some(l=>l.to===id)&&automationHasPath("miners",id);const outgoing=g.links.some(l=>l.from===id);return incoming&&(outgoing||n.type==="sell"||n.type==="contract");}
         let automationGraphZoom=1,automationFlowZoom=1;
         function applyAutomationZoom(){
             const graph=document.getElementById("automation-graph"),flow=document.getElementById("automation-flow-svg");
@@ -1265,7 +1266,7 @@ function setupPowerPlantControls(){
             const g=ensureAutomationGraph(),powered=(game.powerRatios?.automation??0)>0,minersPowered=(game.powerRatios?.miners??1)>0;
             const reachable=new Set(["miners"]),queue=["miners"];
             while(queue.length){const id=queue.shift();g.links.filter(l=>l.from===id).forEach(l=>{if(!reachable.has(l.to)){reachable.add(l.to);queue.push(l.to);}});}
-            const nodeActive=n=>n.type==="miners"?minersPowered:(reachable.has(n.id)&&minersPowered&&(n.type==="contract"?((game.upgrades["a_contract_auto"]||0)>0&&game.automation?.policy==="balanced"&&(game.powerRatios?.contracts??0)>0):powered)&&(n.type!=="sell"||game.autoSellEnabled));
+            const nodeActive=n=>n.type==="miners"?minersPowered:(reachable.has(n.id)&&automationNodeBound(n.id)&&minersPowered&&(n.type==="contract"?((game.upgrades["a_contract_auto"]||0)>0&&game.automation?.policy==="balanced"&&(game.powerRatios?.contracts??0)>0):powered)&&(n.type!=="sell"||game.autoSellEnabled));
             const positions=n=>({x:n.x||0,y:n.y||0});
             let markup="";
             g.links.forEach((l,index)=>{
@@ -1644,7 +1645,6 @@ function setupPowerPlantControls(){
             document.getElementById("rig-stat-multi").textContent = `${(game.minerMultiOreChance * 100).toFixed(0)}%`;
             document.getElementById("rig-stat-luck").textContent = `${game.luckMultiplier.toFixed(2)}x`;
             const power = calculatePowerAllocation();
-            renderPowerPlants();
             document.getElementById("rig-stat-power").textContent = formatNumber(power.generated) + " W";
             const put = (id,value) => { const el=document.getElementById(id); if(el) el.textContent=value; };
             put("power-generated",formatNumber(power.generated)+" W"); put("power-demand",formatNumber(power.demand)+" W");
