@@ -292,7 +292,7 @@
         <strong>Funds:</strong> <span id="hud-cash">$0.00</span> | 
         <strong>Depth:</strong> <span id="hud-depth">1m (Tier 1)</span> | 
         <strong>Miners:</strong> <span id="hud-miners">1 / 1</span>
-        <span id="hud-prestige-container" class="hidden"> | <strong>Core Essence (Rank I):</strong> <span id="hud-prestige">0</span></span>
+        <span id="hud-prestige-container" class="hidden"> | <strong>Core Essence:</strong> <span id="hud-prestige">0</span></span>
         <div style="float: right;">
             [<a id="btn-save" href="javascript:void(0)">Save Game</a>] 
             [<a id="btn-settings" href="javascript:void(0)">Settings</a>]
@@ -497,7 +497,7 @@
             <div class="infobox" style="background-color: #f0f0ff; border-color: #a0a0d0;">
                 <h3>Core Reformation Protocol</h3>
                 <p>Reform your facility to earn Core Essence. Your lifetime Core Essence total determines your rank. Every new rank permanently unlocks a perk; ranks and their perks are never spent or lost on reformation.</p>
-                <p>Core Essence gained on reformation: <strong id="prestige-pending-tokens">0 Rank I</strong></p>
+                <p>Core Essence gained on reformation: <strong id="prestige-pending-tokens">0</strong></p>
                 <button id="btn-do-prestige"><b>[ REFORM CORE ]</b></button>
             </div>
 
@@ -506,7 +506,7 @@
             <div id="core-rank-ladder"></div>
             <h3>Core Essence Research</h3>
             <p>Spend your current Core Essence on the research upgrades below. Spending Essence does not reduce your lifetime rank progress.</p>
-            <h3>Permanent Core Evolution Perks</h3>
+            <h3>Permanent Rank Research</h3>
             <div id="prestige-perks-grid">
                 <!-- JS populates ascension upgrades -->
             </div>
@@ -1526,7 +1526,7 @@
                 recalculateStats();
                 renderPrestigeTab();
                 updateUIHUD();
-                logDrop(`Purchased Core Evolution Perk: ${perk.name}`, "#0000b3");
+                logDrop(`Purchased permanent research: ${perk.name}`, "#0000b3");
             }
         }
 
@@ -1557,7 +1557,7 @@
                 return;
             }
 
-            if (confirm(`Reform the facility now? Reset cash and standard upgrades to gain ${pending} Rank I Core Essence? Your Core Expansion milestones will also be evaluated.`)) {
+            if (confirm(`Reform the facility now? Reset cash and standard upgrades to gain ${pending} Core Essence? Your lifetime rank progress and unlocked perks are permanent.`)) {
                 ensureCoreRanks(); game.coreRanks[1] += pending; game.prestigeTokens = game.coreRanks[1];
                 game.totalPrestigeResets++;
                 const oldRank=getCoreRank();
@@ -1625,7 +1625,7 @@
 
             // Calculate pending ascension tokens
             const pendingTokens = calculatePendingPrestigeTokens();
-            document.getElementById("prestige-pending-tokens").textContent = formatNumber(pendingTokens)+" Rank I";
+            document.getElementById("prestige-pending-tokens").textContent = formatNumber(pendingTokens);
             updateLiveActionButtons();
         }
 
