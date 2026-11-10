@@ -245,7 +245,8 @@
         #automation-toolbar{background:#f8f9fa;color:#222;border-bottom:1px solid #a2a9b1;padding:8px;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
         #automation-graph-viewport{height:590px;overflow:auto;position:relative;background-color:#222831;background-image:linear-gradient(rgba(255,255,255,.055) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.055) 1px,transparent 1px);background-size:24px 24px;touch-action:pan-x pan-y}
         #automation-graph{position:relative;width:1200px;height:760px}
-        #automation-wires{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible}
+        #automation-wires{position:absolute;inset:0;width:100%;height:100%;pointer-events:auto;overflow:visible}
+        .auto-wire{cursor:pointer;pointer-events:stroke}.auto-wire:hover{stroke:#f0c674;stroke-width:5}
         .auto-wire{fill:none;stroke:#62c88a;stroke-width:3}
         .auto-node{position:absolute;width:190px;background:#303943;border:1px solid #82909d;border-radius:5px;color:#f4f6f8;box-shadow:0 3px 9px #0008;z-index:2;user-select:none}
         .auto-node.selected{outline:2px solid #f0c674}
@@ -1105,7 +1106,9 @@
         }
         let automationPendingOutput=null,automationSelectedNode=null,automationNodeCounter=0;
         function setupAutomationGraph(){
-            document.getElementById("automation-add-node")?.addEventListener("click",()=>{const type=document.getElementById("automation-add-type").value,g=ensureAutomationGraph(),id=type+"_"+(++automationNodeCounter);g.nodes.push({id:id,type:type,x:35+(g.nodes.length%4)*255,y:440+Math.floor(g.nodes.length/4)*120,share:50,threshold:10,reserve:100,tier:1});automationSelectedNode=id;automationSaveGraph();});
+            const graph=ensureAutomationGraph();
+            graph.nodes.forEach(n=>{const match=String(n.id).match(/_(\d+)$/);if(match)automationNodeCounter=Math.max(automationNodeCounter,Number(match[1]));});
+            document.getElementById("automation-add-node")?.addEventListener("click",()=>{const type=document.getElementById("automation-add-type").value,g=ensureAutomationGraph();let id;do{id=type+"_"+(++automationNodeCounter);}while(g.nodes.some(n=>n.id===id));g.nodes.push({id:id,type:type,x:35+(g.nodes.length%4)*255,y:440+Math.floor(g.nodes.length/4)*120,share:50,threshold:10,reserve:100,tier:1});automationSelectedNode=id;automationSaveGraph();});
             document.getElementById("automation-clear-link")?.addEventListener("click",()=>{automationPendingOutput=null;renderAutomationGraph();});
             document.getElementById("automation-reset-graph")?.addEventListener("click",()=>{if(confirm("Replace your current graph with the example layout?")){game.automation.graph=defaultAutomationGraph();automationPendingOutput=null;automationSaveGraph();}});
             renderAutomationGraph();
@@ -1114,7 +1117,7 @@
         function renderAutomationGraph(){
             const root=document.getElementById("automation-graph");if(!root)return;const g=ensureAutomationGraph(),svg=document.getElementById("automation-wires");
             root.querySelectorAll(".auto-node").forEach(n=>n.remove());svg.innerHTML="";
-            g.links.forEach(l=>{const a=automationNode(l.from),b=automationNode(l.to);if(!a||!b)return;const p=document.createElementNS("http://www.w3.org/2000/svg","path"),ax=a.x+190,ay=a.y+70+(l.out||0)*22,bx=b.x,by=b.y+70+(l.input||0)*22;p.setAttribute("d","M "+ax+" "+ay+" C "+(ax+65)+" "+ay+", "+(bx-65)+" "+by+", "+bx+" "+by);p.setAttribute("class","auto-wire");svg.appendChild(p);});
+            g.links.forEach((l,index)=>{const a=automationNode(l.from),b=automationNode(l.to);if(!a||!b)return;const p=document.createElementNS("http://www.w3.org/2000/svg","path"),ax=a.x+190,ay=a.y+70+(l.out||0)*22,bx=b.x,by=b.y+70+(l.input||0)*22;p.setAttribute("d","M "+ax+" "+ay+" C "+(ax+65)+" "+ay+", "+(bx-65)+" "+by+", "+bx+" "+by);p.setAttribute("class","auto-wire");p.setAttribute("stroke-width","12");p.setAttribute("stroke-opacity","0.01");p.addEventListener("click",()=>{g.links.splice(index,1);automationSaveGraph();});svg.appendChild(p);const visible=p.cloneNode(false);visible.setAttribute("stroke-width","3");visible.setAttribute("stroke-opacity","1");visible.style.pointerEvents="none";svg.appendChild(visible);});
             g.nodes.forEach(node=>{
                 const spec=AUTOMATION_NODE_TYPES[node.type];if(!spec)return;const el=document.createElement("div");el.className="auto-node"+(automationSelectedNode===node.id?" selected":"");el.style.left=node.x+"px";el.style.top=node.y+"px";
                 let html='<div class="auto-node-head">'+spec.name+' <small>· '+node.id+'</small></div><div class="auto-node-body"><div>'+spec.desc+'</div>';
@@ -1128,7 +1131,7 @@
                 el.addEventListener("click",e=>{
                     const pin=e.target.closest("[data-pin]");
                     if(pin){e.stopPropagation();const index=Number(pin.dataset.index);if(pin.dataset.pin==="out"){automationPendingOutput={node:node.id,index:index};renderAutomationGraph();}
-                    else if(automationPendingOutput&&automationPendingOutput.node!==node.id){const exists=g.links.some(l=>l.from===automationPendingOutput.node&&l.to===node.id&&l.input===index);if(!exists)g.links.push({from:automationPendingOutput.node,to:node.id,out:automationPendingOutput.index,input:index});automationPendingOutput=null;automationSaveGraph();}
+                    else if(automationPendingOutput&&automationPendingOutput.node!==node.id){const exists=g.links.some(l=>l.to===node.id&&l.input===index);if(!exists){g.links.push({from:automationPendingOutput.node,to:node.id,out:automationPendingOutput.index,input:index});}automationPendingOutput=null;automationSaveGraph();}
                     else{automationPendingOutput=null;renderAutomationGraph();}return;}
                     if(e.target.closest("[data-delete-node]")){g.links=g.links.filter(l=>l.from!==node.id&&l.to!==node.id);g.nodes=g.nodes.filter(n=>n.id!==node.id);automationSelectedNode=null;automationSaveGraph();return;}
                     if(e.target.matches("[data-config]"))return;automationSelectedNode=node.id;renderAutomationInspector(node);renderAutomationGraph();
