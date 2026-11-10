@@ -284,7 +284,7 @@
         .flow-node .flow-sub{font:12px Arial,sans-serif;fill:#54595d;font-weight:normal}
         .flow-particle{fill:#36c;stroke:#fff;stroke-width:1}
         #automation-flow-status{font:12px monospace;padding:7px;background:#f8f9fa;border-top:1px solid #a2a9b1}
-        .core-rank-record{border:1px solid #a2a9b1;background:#f8f9fa;padding:9px;margin:8px 0}
+        .core-rank-record{border:1px solid #a2a9b1;background:#fff;padding:10px;margin:8px 0;display:inline-block;vertical-align:top;width:calc(50% - 34px);min-height:112px;box-sizing:border-box}.core-rank-record.unlocked{border-left:4px solid #54595d;background:#f8f9fa}.core-rank-record.current{border:1px solid #36c;background:#f5f8ff}.core-rank-record.locked{opacity:.75}@media(max-width:620px){.core-rank-record{width:100%;}}
         .core-rank-record.unlocked{border-left:5px solid #29945a;background:#f1faf3}
         .core-rank-record.current{border:2px solid #9b7b22;background:#fffbea}
         .core-rank-record.locked{opacity:.82}
@@ -863,16 +863,16 @@
         ];
 
         const CORE_RANKS = [
-            {title:"I",name:"Prospector",essence:10,perk:"First Strike",effect:"+10% ore sale value.",cash:1.10},
+            {title:"I",name:"Prospector",essence:10,perk:"First Strike",effect:"+10% ore sale value.",cash:1.10,unlock:"Solar arrays"},
             {title:"II",name:"Drillhand",essence:25,perk:"Quick Turn",effect:"+10% mining speed.",speed:1.10},
-            {title:"III",name:"Surveyor",essence:50,perk:"Rare Signal",effect:"+15% rare ore luck.",luck:1.15},
+            {title:"III",name:"Surveyor",essence:50,perk:"Rare Signal",effect:"+15% rare ore luck.",luck:1.15,unlock:"Coal generators and fuel controls"},
             {title:"IV",name:"Foreman",essence:100,perk:"Expanded Crew",effect:"+1 permanent miner slot.",slots:1},
             {title:"V",name:"Broker",essence:200,perk:"Market Authority",effect:"+25% ore sale value.",cash:1.25},
-            {title:"VI",name:"Powerwright",essence:400,perk:"Overcapacity",effect:"+25% power generation.",power:1.25},
+            {title:"VI",name:"Powerwright",essence:400,perk:"Overcapacity",effect:"+25% power generation.",power:1.25,unlock:"Nuclear fission plants"},
             {title:"VII",name:"Deep Engineer",essence:800,perk:"Double Extraction",effect:"+10% chance for one additional ore.",multi:0.10},
-            {title:"VIII",name:"Master Driller",essence:1600,perk:"Rapid Descent",effect:"+25% mining speed.",speed:1.25},
+            {title:"VIII",name:"Master Driller",essence:1600,perk:"Rapid Descent",effect:"+25% mining speed.",speed:1.25,unlock:"Large solar farms"},
             {title:"IX",name:"Magnate",essence:3200,perk:"Industrial Empire",effect:"+2 permanent miner slots and +25% rare ore luck.",slots:2,luck:1.25},
-            {title:"X",name:"Core Sovereign",essence:6400,perk:"Absolute Yield",effect:"+50% sale value, mining speed, and power generation.",cash:1.50,speed:1.50,power:1.50}
+            {title:"X",name:"Core Sovereign",essence:6400,perk:"Absolute Yield",effect:"+50% sale value, mining speed, and power generation.",cash:1.50,speed:1.50,power:1.50,unlock:"Geothermal and fusion plants"}
         ];
 
         /* --- HELPER FUNCTIONS --- */
@@ -924,7 +924,7 @@
             const rank=getCoreRank(),next=CORE_RANKS[rank],total=game.totalCoreEssenceEarned||0;
             let html='<p><strong>Current rank:</strong> '+(rank?('Rank '+CORE_RANKS[rank-1].title+' — '+CORE_RANKS[rank-1].name):'Unranked')+' · <strong>Lifetime Core Essence:</strong> '+formatNumber(total)+'</p>';
             if(next)html+='<p><strong>Next rank:</strong> '+next.title+' — '+next.name+' ('+formatNumber(Math.max(0,next.essence-total))+' more lifetime Essence required)</p>';
-            CORE_RANKS.forEach((r,i)=>{const earned=i<rank,progress=Math.min(100,total/r.essence*100);html+='<div class="core-rank-record '+(earned?'unlocked':'locked')+'"><strong>Rank '+r.title+' — '+r.name+'</strong> '+(earned?'✓ UNLOCKED':'LOCKED')+'<br><strong>Perk: '+r.perk+'</strong> — '+r.effect+'<div class="core-rank-progress"><span style="width:'+progress+'%"></span></div><small>'+formatNumber(Math.min(total,r.essence))+' / '+formatNumber(r.essence)+' lifetime Core Essence</small></div>';});
+            CORE_RANKS.forEach((r,i)=>{const earned=i<rank,progress=Math.min(100,total/r.essence*100);html+='<div class="core-rank-record '+(earned?'unlocked':'locked')+'"><strong>Rank '+r.title+' — '+r.name+'</strong> <span>'+(earned?'✓ Unlocked':'Locked')+'</span><p><strong>'+r.perk+'</strong> — '+r.effect+'</p><small>Unlock: '+(r.unlock||'Permanent rank perk')+'</small><div class="core-rank-progress"><span style="width:'+progress+'%"></span></div><small>'+formatNumber(Math.min(total,r.essence))+' / '+formatNumber(r.essence)+' lifetime Essence</small></div>';});
             root.innerHTML=html;
         }
 
