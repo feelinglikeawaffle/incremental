@@ -368,7 +368,7 @@
                     <tr><td>Contract terminal</td><td id="power-contract-demand">0 W</td><td id="power-contract-allocated">0 W</td><td id="power-contract-status">Standby</td></tr>
                 </table>
                 <p><label>Power allocation priority: <select id="power-priority"><option value="miners">Mining first</option><option value="automation">Automation first</option><option value="contracts">Contracts first</option></select></label></p>
-                <p>Power is a shared budget. Every active machine draws watts; shortages slow or pause lower-priority systems.</p>
+                <p>Power is a shared budget. Output changes with daylight and fuel. Set priorities, build sources, and automate fuel selection.</p><div id="power-plant-workshop" class="infobox"><h3>Power Plant Construction Mode</h3><p><button id="power-build-mode" type="button">Enter power building mode</button> <span id="power-build-status">Mode: normal</span></p><p>Available sources: <span id="power-build-options"></span></p><div id="power-plant-list"></div></div>
             </div>
             <h3>Active Mining Nodes (<span id="rig-slots-label">1 / 1</span>)</h3>
             <div id="miners-grid">
@@ -775,6 +775,7 @@
             powerOutputMult: 1.0,
             powerStability: 0,
             powerGrid: { priority: "miners" },
+            powerPlants: [{id:1,type:"solar",name:"Solar Array",level:1,active:true,fuelPolicy:"whitelist",fuelOre:"coal"}], nextPowerPlantId:2, powerClock:0, powerPlantOutput:0,
             powerRatios: { miners: 1, automation: 1, contracts: 1 },
             automation: { graph:null, policy:"balanced", reserve:0, minBatch:1, marketShare:100 },
 
