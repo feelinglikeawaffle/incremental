@@ -270,7 +270,7 @@
         <strong>Funds:</strong> <span id="hud-cash">$0.00</span> | 
         <strong>Depth:</strong> <span id="hud-depth">1m (Tier 1)</span> | 
         <strong>Miners:</strong> <span id="hud-miners">1 / 1</span>
-        <span id="hud-prestige-container" class="hidden"> | <strong>Prestige AP:</strong> <span id="hud-prestige">0 AP</span></span>
+        <span id="hud-prestige-container" class="hidden"> | <strong>Core Essence (Rank I):</strong> <span id="hud-prestige">0</span></span>
         <div style="float: right;">
             [<a id="btn-save" href="javascript:void(0)">Save Game</a>] 
             [<a id="btn-settings" href="javascript:void(0)">Settings</a>]
@@ -290,7 +290,7 @@
         <span data-tab="tab-upgrades" class="tab-btn">Upgrades</span> |
         <span data-tab="tab-automation" class="tab-btn">Automation</span> |
         <span data-tab="tab-depth" class="tab-btn">Depth Strata</span> |
-        <span data-tab="tab-prestige" class="tab-btn">Ascension</span> |
+        <span data-tab="tab-prestige" class="tab-btn">Core Evolution</span> |
         <span data-tab="tab-stats" class="tab-btn">Statistics & Codex</span>
     </div>
 
@@ -462,16 +462,19 @@
 
         <!-- TAB 5: ASCENSION -->
         <div id="tab-prestige" class="tab-content hidden">
-            <h2>Quantum Core Ascension</h2>
+            <h2>Core Evolution</h2>
 
             <div class="infobox" style="background-color: #f0f0ff; border-color: #a0a0d0;">
-                <h3>Facility Reset Protocol</h3>
-                <p>Collapse your active facility to extract <strong>Ascension Tokens (AP)</strong>. Resetting clears Cash, Miners, and Standard Upgrades, but permanently grants massive global multipliers and enables transcendent perks.</p>
-                <p>Pending Ascension Tokens on Reset: <strong id="prestige-pending-tokens">0 AP</strong></p>
-                <button id="btn-do-prestige"><b>[ ASCEND FACILITY NOW ]</b></button>
+                <h3>Core Reformation Protocol</h3>
+                <p>Reform your facility to extract Core Essence (Rank I). The reset clears cash, miners, inventory, and standard upgrades while preserving Core Essence and permanent evolution perks.</p>
+                <p>Core Essence gained on reformation: <strong id="prestige-pending-tokens">0 AP</strong></p>
+                <button id="btn-do-prestige"><b>[ REFORM CORE ]</b></button>
             </div>
 
-            <h3>Transcendent Ascension Perks</h3>
+            <h3>Core Essence Ranks</h3>
+            <p>Combine 10 units of one rank to create 1 unit of the next rank. Rank I is the base currency earned from Core Reformation. Higher ranks can be broken back down at the same 10:1 rate.</p>
+            <div id="core-rank-ladder"></div>
+            <h3>Permanent Core Evolution Perks</h3>
             <div id="prestige-perks-grid">
                 <!-- JS populates ascension upgrades -->
             </div>
@@ -751,6 +754,7 @@
 
             // Prestige
             prestigeTokens: 0,
+            coreRanks: {1:0,2:0,3:0,4:0,5:0,6:0,7:0,8:0,9:0,10:0},
             totalPrestigeResets: 0,
             prestigeMultipliers: {
                 cashMult: 1.0,
@@ -838,7 +842,47 @@
             checkOfflineEarnings();
         };
 
+
+        function ensureCoreRanks() {
+            if (!game.coreRanks || typeof game.coreRanks !== "object") game.coreRanks = {};
+            for (let rank=1; rank<=10; rank++) game.coreRanks[rank] = Math.max(0, Math.floor(Number(game.coreRanks[rank]) || 0));
+            game.coreRanks[1] = Math.max(game.coreRanks[1], Math.max(0, Math.floor(Number(game.prestigeTokens) || 0)));
+            game.prestigeTokens = game.coreRanks[1];
+        }
+
+        function coreRankUp(rank) {
+            ensureCoreRanks();
+            if (rank < 1 || rank >= 10 || game.coreRanks[rank] < 10) return;
+            game.coreRanks[rank] -= 10; game.coreRanks[rank+1]++;
+            game.prestigeTokens = game.coreRanks[1];
+            saveGame(); renderCoreRanks(); renderPrestigeTab(); updateUIHUD();
+        }
+
+        function coreRankDown(rank) {
+            ensureCoreRanks();
+            if (rank < 2 || rank > 10 || game.coreRanks[rank] < 1) return;
+            game.coreRanks[rank]--; game.coreRanks[rank-1] += 10;
+            game.prestigeTokens = game.coreRanks[1];
+            saveGame(); renderCoreRanks(); renderPrestigeTab(); updateUIHUD();
+        }
+
+        function renderCoreRanks() {
+            const root=document.getElementById("core-rank-ladder");
+            if (!root) return;
+            ensureCoreRanks();
+            const names=["I","II","III","IV","V","VI","VII","VIII","IX","X"];
+            let html='<table class="wikitable"><thead><tr><th>Rank</th><th>Core Essence</th><th>Promotion</th><th>Demotion</th></tr></thead><tbody>';
+            for (let rank=1; rank<=10; rank++) {
+                const count=game.coreRanks[rank];
+                const promote=rank<10 ? '<button onclick="coreRankUp('+rank+')" '+(count<10?'disabled':'')+'>Promote 10 → 1 Rank '+names[rank]+'</button>' : 'MAX RANK';
+                const demote=rank>1 ? '<button onclick="coreRankDown('+rank+')" '+(count<1?'disabled':'')+'>Break down 1 → 10 Rank '+names[rank-2]+'</button>' : '—';
+                html+='<tr><td><strong>Rank '+names[rank-1]+'</strong></td><td>'+formatNumber(count)+'</td><td>'+promote+'</td><td>'+demote+'</td></tr>';
+            }
+            root.innerHTML=html+'</tbody></table>';
+        }
+
         function initData() {
+            ensureCoreRanks();
             ORE_TIERS.forEach(tier => {
                 tier.ores.forEach(ore => {
                     if (!game.inventory[ore.id]) game.inventory[ore.id] = 0;
@@ -1386,6 +1430,7 @@
             const cost = Math.floor(perk.baseCost * Math.pow(perk.costMult, currentLvl));
             if (game.prestigeTokens >= cost) {
                 game.prestigeTokens -= cost;
+                ensureCoreRanks(); game.coreRanks[1] = game.prestigeTokens;
                 game.prestigePerks[perk.id] = currentLvl + 1;
                 recalculateStats();
                 renderPrestigeTab();
@@ -1423,6 +1468,7 @@
 
             if (confirm(`Ascend facility now? Reset cash and standard upgrades to gain ${pending} AP?`)) {
                 game.prestigeTokens += pending;
+                ensureCoreRanks(); game.coreRanks[1] += pending; game.prestigeTokens = game.coreRanks[1];
                 game.totalPrestigeResets++;
 
                 // Reset standard stats
@@ -1455,7 +1501,8 @@
             const prestigeContainer = document.getElementById("hud-prestige-container");
             if (game.totalPrestigeResets > 0 || game.prestigeTokens > 0) {
                 prestigeContainer.classList.remove("hidden");
-                document.getElementById("hud-prestige").textContent = `${formatNumber(game.prestigeTokens)} AP`;
+                ensureCoreRanks();
+                document.getElementById("hud-prestige").textContent = formatNumber(game.prestigeTokens);
             }
 
             // Stats tab real-time sync
@@ -1482,7 +1529,7 @@
 
             // Calculate pending ascension tokens
             const pendingTokens = calculatePendingPrestigeTokens();
-            document.getElementById("prestige-pending-tokens").textContent = `${formatNumber(pendingTokens)} AP`;
+            document.getElementById("prestige-pending-tokens").textContent = formatNumber(pendingTokens)+" Rank I";
         }
 
         function setupUI() {
@@ -1768,6 +1815,7 @@
         }
 
         function renderPrestigeTab() {
+            renderCoreRanks();
             const grid = document.getElementById("prestige-perks-grid");
             if (!grid) return;
             grid.innerHTML = "";
@@ -1890,6 +1938,7 @@
                 automation: game.automation,
                 powerGrid: game.powerGrid,
                 prestigeTokens: game.prestigeTokens,
+                coreRanks: game.coreRanks,
                 totalPrestigeResets: game.totalPrestigeResets,
                 inventory: game.inventory,
                 upgrades: game.upgrades,
@@ -1907,6 +1956,7 @@
             try {
                 const parsed = JSON.parse(saved);
                 Object.assign(game, parsed);
+                ensureCoreRanks();
                 if (!game.automation) game.automation = {};
                 if (!game.automation.graph) game.automation.graph = defaultAutomationGraph();
                 if (!game.powerGrid) game.powerGrid = { priority:"miners" };
