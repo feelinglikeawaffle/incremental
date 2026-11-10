@@ -436,7 +436,7 @@
                 </div>
                 <p><strong>Global settings:</strong>
                     <label>Policy <select id="automation-policy"><option value="balanced">Balanced</option><option value="sell">Sell surplus first</option><option value="stockpile">Stockpile only</option></select></label>
-                    <label>Power priority <select id="power-priority"><option value="miners">Mining first</option><option value="automation">Automation first</option><option value="contracts">Contracts first</option></select></label>
+                    <span>Power priority is configured in the Mining Rig power grid.</span>
                 </p>
             </div>
         </div>
@@ -1123,7 +1123,7 @@
         function setupAutomationGraph(){
             const graph=ensureAutomationGraph();
             graph.nodes.forEach(n=>{const match=String(n.id).match(/_(\d+)$/);if(match)automationNodeCounter=Math.max(automationNodeCounter,Number(match[1]));});
-            document.getElementById("automation-add-node")?.addEventListener("click",()=>{const type=document.getElementById("automation-add-type").value,g=ensureAutomationGraph();let id;do{id=type+"_"+(++automationNodeCounter);}while(g.nodes.some(n=>n.id===id));g.nodes.push({id:id,type:type,x:35+(g.nodes.length%4)*255,y:440+Math.floor(g.nodes.length/4)*120,share:50,threshold:10,reserve:100,tier:1});automationSelectedNode=id;automationSaveGraph();});
+            document.getElementById("automation-add-node")?.addEventListener("click",()=>{const type=document.getElementById("automation-add-type").value,g=ensureAutomationGraph();let id;do{id=type+"_"+(++automationNodeCounter);}while(g.nodes.some(n=>n.id===id));g.nodes.push({id:id,type:type,x:35+(g.nodes.length%4)*255,y:440+Math.floor(g.nodes.length/4)*120,share:50,threshold:10,reserve:100,tier:1,tierStart:3,tierEnd:5,efficiency:15});automationSelectedNode=id;automationSaveGraph();});
             document.getElementById("automation-clear-link")?.addEventListener("click",()=>{automationPendingOutput=null;renderAutomationGraph();});
             document.getElementById("automation-reset-graph")?.addEventListener("click",()=>{if(confirm("Replace your current graph with the example layout?")){game.automation.graph=defaultAutomationGraph();automationPendingOutput=null;automationSaveGraph();}});
             renderAutomationGraph();
@@ -1142,6 +1142,13 @@
                 if(node.type==="buffer")html+='<label>Batch size <input data-config="threshold" type="number" min="1" value="'+(node.threshold??10)+'"></label>';
                 if(node.type==="storage")html+='<label>Reserve <input data-config="reserve" type="number" min="0" value="'+(node.reserve??100)+'"></label>';
                 if(node.type==="filter"){html+='<label>Ore tier <select data-config="tier">';ORE_TIERS.forEach(t=>{html+='<option value="'+t.tier+'" '+(Number(node.tier||1)===t.tier?"selected":"")+' >Tier '+t.tier+'</option>';});html+='</select></label>';}
+                if(["crusher","smelter","refinery","resonator"].includes(node.type)){
+                    html+='<label>First tier <select data-config="tierStart">';
+                    ORE_TIERS.forEach(t=>{html+='<option value="'+t.tier+'" '+(Number(node.tierStart||3)===t.tier?"selected":"")+' >Tier '+t.tier+'</option>';});
+                    html+='</select></label><label>Last tier <select data-config="tierEnd">';
+                    ORE_TIERS.forEach(t=>{html+='<option value="'+t.tier+'" '+(Number(node.tierEnd||5)===t.tier?"selected":"")+' >Tier '+t.tier+'</option>';});
+                    html+='</select></label><label>Value bonus % <input data-config="efficiency" type="number" min="0" max="500" value="'+(node.efficiency??15)+'"></label>';
+                }
                 html+='<div style="text-align:right"><button data-delete-node="'+node.id+'" '+(node.type==="miners"?"disabled":"")+'>Remove</button></div></div>';el.innerHTML=html;
                 el.addEventListener("click",e=>{
                     const pin=e.target.closest("[data-pin]");
