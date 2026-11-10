@@ -285,10 +285,13 @@
         .flow-node .flow-sub{font:12px Arial,sans-serif;fill:#54595d;font-weight:normal}
         .flow-particle{fill:#36c;stroke:#fff;stroke-width:1}
         #automation-flow-status{font:12px monospace;padding:7px;background:#f8f9fa;border-top:1px solid #a2a9b1}
-        .core-rank-record{border:1px solid #a2a9b1;background:#fff;padding:10px;margin:8px 0;display:inline-block;vertical-align:top;width:calc(50% - 34px);min-height:112px;box-sizing:border-box}.core-rank-record.unlocked{border-left:4px solid #54595d;background:#f8f9fa}.core-rank-record.current{border:1px solid #36c;background:#f5f8ff}.core-rank-record.locked{opacity:.75}@media(max-width:620px){.core-rank-record{width:100%;}}
-        .core-rank-record.unlocked{border-left:5px solid #29945a;background:#f1faf3}
-        .core-rank-record.current{border:2px solid #9b7b22;background:#fffbea}
-        .core-rank-record.locked{opacity:.82}
+        .core-rank-record{display:block;width:100%;box-sizing:border-box;border:1px solid #a2a9b1;border-left:4px solid #72777d;background:#fff;padding:11px 13px;margin:9px 0;min-height:0}
+        .core-rank-record.unlocked{background:#f8f9fa}
+        .core-rank-record.current{border-left:4px solid #36c;background:#f5f8ff}
+        .core-rank-record.locked{background:#fff;color:#54595d;opacity:1}
+        .core-rank-record p{margin:6px 0}
+        .core-rank-record small{color:#54595d}
+        .core-rank-record .rank-heading{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;font-weight:600}
         .core-rank-progress{height:9px;background:#e0e0e0;border:1px solid #a2a9b1;margin:5px 0}
         .core-rank-progress span{display:block;height:100%;background:#29945a}
         @keyframes flow-dash{to{stroke-dashoffset:-34}}
@@ -915,7 +918,7 @@
 
 
         function coreRankRoman(value){const pairs=[[1000,"M"],[900,"CM"],[500,"D"],[400,"CD"],[100,"C"],[90,"XC"],[50,"L"],[40,"XL"],[10,"X"],[9,"IX"],[5,"V"],[4,"IV"],[1,"I"]];let n=value,out="";pairs.forEach(([v,sym])=>{while(n>=v){out+=sym;n-=v;}});return out||String(value);}
-        function ensureInfiniteCoreRankDefinitions(){const total=Number(game.totalCoreEssenceEarned)||0;while(CORE_RANKS.length<1000&&(CORE_RANKS.length===0||CORE_RANKS[CORE_RANKS.length-1].essence<=total||CORE_RANKS.length<15)){const index=CORE_RANKS.length+1,previous=CORE_RANKS[CORE_RANKS.length-1],essence=previous?Math.min(Number.MAX_VALUE,previous.essence*2):12800;const slot=index%5===0?1:0,kind=index%4;const bonus=1.03;CORE_RANKS.push({title:coreRankRoman(index),name:["Ascendant","Void Architect","Continuum Keeper","Eternal Prospector"][kind]+" "+index,essence,perk:["Industrial Momentum","Deep Resonance","Market Dominion","Grid Mastery"][kind],effect:kind===0?"+3% ore sale value.":kind===1?"+3% mining speed.":kind===2?"+3% rare ore luck.":"+3% power generation.",cash:kind===0?bonus:1,speed:kind===1?bonus:1,luck:kind===2?bonus:1,power:kind===3?bonus:1,slots:slot,multi:index%5===0?.01:0,unlock:slot?"+1 permanent miner slot and a new facility expansion":"A permanent 3% specialist bonus"});}}
+        function ensureInfiniteCoreRankDefinitions(){const total=Number(game.totalCoreEssenceEarned)||0;while(CORE_RANKS.length<1000&&(CORE_RANKS.length===0||CORE_RANKS[CORE_RANKS.length-1].essence<=total||CORE_RANKS.length<15)){const index=CORE_RANKS.length+1,previous=CORE_RANKS[CORE_RANKS.length-1],essence=previous?Math.min(Number.MAX_VALUE,previous.essence*2):12800;const slot=index%5===0?1:0,kind=index%4;const bonus=1.03;CORE_RANKS.push({title:coreRankRoman(index),name:["Ascendant","Void Architect","Continuum Keeper","Eternal Prospector"][kind]+" "+index,essence,perk:["Industrial Momentum","Deep Resonance","Market Dominion","Grid Mastery"][kind],effect:kind===0?"+3% ore sale value.":kind===1?"+3% mining speed.":kind===2?"+3% rare ore luck.":"+3% power generation.",cash:kind===0?bonus:1,speed:kind===1?bonus:1,luck:kind===2?bonus:1,power:kind===3?bonus:1,slots:slot,multi:index%5===0?.01:0,unlock:index===11?"Stellar Forge power infrastructure":index===15?"Multiverse Reactor power infrastructure":index===20?"Omniversal Core power infrastructure":slot?"+1 permanent miner slot and a new facility expansion":"A permanent 3% specialist bonus"});}}
         function ensureCoreRanks() {
             if (!game.coreRanks || typeof game.coreRanks !== "object") game.coreRanks = {};
             for (let rank=1; rank<=10; rank++) game.coreRanks[rank] = Math.max(0, Math.floor(Number(game.coreRanks[rank]) || 0));
