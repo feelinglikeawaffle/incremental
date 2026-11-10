@@ -458,7 +458,7 @@
                         <select id="automation-add-type">
                             <option value="sorter">Ore Sorter</option><option value="filter">Ore Filter</option><option value="splitter">Distribution Splitter</option>
                             <option value="buffer">Batch Buffer</option><option value="storage">Storage Vault</option><option value="market">Market Router</option>
-                            <option value="sell">Sell Ore</option><option value="contract">Contract Terminal</option><option value="crusher">Ore Crusher</option><option value="smelter">Alloy Smelter</option><option value="refinery">Deep Refinery</option><option value="resonator">Crystal Resonator</option>
+                            <option value="sell">Sell Ore</option><option value="contract">Contract Terminal</option><option value="crusher">Ore Crusher</option><option value="smelter">Alloy Smelter</option><option value="refinery">Deep Refinery</option><option value="resonator">Crystal Resonator</option><option value="whitelist">Ore Whitelist</option><option value="blacklist">Ore Blacklist</option>
                         </select>
                         <button id="automation-add-node">Add Node</button><button id="automation-clear-link">Cancel Connection</button><button id="automation-reset-graph">Reset Example Graph</button>
                     </div>
@@ -753,6 +753,7 @@
             [{ id:"eternium", name:"Eternium", value:80000000000000000000000, weight:6, icon:"fa-gem", color:"#fda4af" }, { id:"origin_core", name:"Origin Core", value:500000000000000000000000, weight:3, icon:"fa-atom", color:"#fff1f2" }]
         ];
         ORE_TIERS.forEach((tier, index) => tier.ores.push(...(EXTRA_ORES_BY_TIER[index] || [])));
+        ORE_TIERS[2].ores.push({id:"uranium",name:"Uranium Ore",value:95000,weight:1,icon:"fa-radiation",color:"#65a30d"});
 
         /* --- GAME STATE OBJECT --- */
         const game = {
@@ -1053,7 +1054,14 @@
         }
 
         const POWER_PLANT_TYPES={solar:{name:"Solar Array",watts:14,cost:250,rank:0,mode:"passive",desc:"Daylight-dependent passive output."},solarFarm:{name:"Solar Farm",watts:75,cost:18000,rank:8,mode:"passive",desc:"Large passive solar array."},coal:{name:"Coal Generator",watts:42,cost:2200,rank:3,mode:"fuel",fuel:"coal",rate:.35,desc:"Consumes coal from inventory."},nuclear:{name:"Nuclear Plant",watts:180,cost:180000,rank:6,mode:"fuel",fuel:"uranium",rate:.08,desc:"Consumes uranium from inventory."},geothermal:{name:"Geothermal Station",watts:95,cost:95000,rank:10,mode:"passive",desc:"Stable passive output."},fusion:{name:"Fusion Reactor",watts:650,cost:2500000,rank:10,mode:"passive",desc:"Very high passive output."}};
-        function powerPlantFuelAllowed(plant,id){return (plant.fuelPolicy||"whitelist")==="whitelist"?id===(plant.fuelOre||"coal"):id!==(plant.fuelOre||"coal");}
+        function powerPlantFuelAllowed(plant,id){
+            const nodes=ensureAutomationGraph().nodes.filter(n=>(n.type==="whitelist"||n.type==="blacklist")&&automationHasPath("miners",n.id)&&ensureAutomationGraph().links.some(l=>l.to===n.id));
+            const white=nodes.filter(n=>n.type==="whitelist"),black=nodes.filter(n=>n.type==="blacklist");
+            if(white.length&&!white.some(n=>(n.oreId||"coal")===id))return false;
+            if(black.some(n=>(n.oreId||"coal")===id))return false;
+            if(nodes.length)return true;
+            return (plant.fuelPolicy||"whitelist")==="whitelist"?id===(plant.fuelOre||"coal"):id!==(plant.fuelOre||"coal");
+        }
         function tickPowerPlants(dt){game.powerClock=(game.powerClock||0)+dt;let output=0;(game.powerPlants||[]).forEach(p=>{if(!p.active)return;const spec=POWER_PLANT_TYPES[p.type];if(!spec)return;let factor=1;if(p.type==="solar"||p.type==="solarFarm")factor=.25+.75*(.5+.5*Math.sin((game.powerClock%120)/120*Math.PI*2));if(spec.mode==="fuel"){const id=spec.fuel;let consumed=0;if(powerPlantFuelAllowed(p,id)){const amount=Math.min(game.inventory[id]||0,spec.rate*dt);game.inventory[id]=(game.inventory[id]||0)-amount;consumed=amount;}factor=dt>0?Math.min(1,consumed/(spec.rate*dt)):((game.inventory[id]||0)>0?1:0);}output+=spec.watts*factor*(p.level||1);});game.powerPlantOutput=output;return output;}
 function setupPowerPlantControls(){
             document.getElementById("power-build-mode")?.addEventListener("click",()=>{game.powerGrid.buildMode=!game.powerGrid.buildMode;document.getElementById("power-build-mode").textContent=game.powerGrid.buildMode?"Exit power building mode":"Enter power building mode";document.getElementById("power-build-status").textContent="Mode: "+(game.powerGrid.buildMode?"power construction":"normal");renderPowerPlants();});
@@ -1206,7 +1214,9 @@ function setupPowerPlantControls(){
             crusher:{name:"Ore Crusher",inputs:["Ore input"],outputs:["Crushed ore"],desc:"Processes middle-depth ores for extra sale value."},
             smelter:{name:"Alloy Smelter",inputs:["Ore input"],outputs:["Refined alloy"],desc:"Smelts mid-to-deep ores for a larger value bonus."},
             refinery:{name:"Deep Refinery",inputs:["Ore input"],outputs:["Refined material"],desc:"Refines high-tier ores; consumes more grid power."},
-            resonator:{name:"Crystal Resonator",inputs:["Ore input"],outputs:["Resonated crystal"],desc:"Resonates rare late-game crystals for a strong sale bonus."}
+            resonator:{name:"Crystal Resonator",inputs:["Ore input"],outputs:["Resonated crystal"],desc:"Resonates rare late-game crystals for a strong sale bonus."},
+            whitelist:{name:"Ore Whitelist",inputs:["Ore input"],outputs:["Allowed ore"],desc:"Only passes the selected ore; can also authorize fuel for power plants."},
+            blacklist:{name:"Ore Blacklist",inputs:["Ore input"],outputs:["Allowed ore"],desc:"Blocks the selected ore; can also exclude fuel from power plants."}
         };
         function defaultAutomationGraph(){return {nodes:[
             {id:"miners",type:"miners",x:35,y:100},{id:"sorter",type:"sorter",x:285,y:100},{id:"market",type:"market",x:555,y:70},
@@ -1295,6 +1305,7 @@ function setupPowerPlantControls(){
                 if(node.type==="buffer")html+='<label>Batch size <input data-config="threshold" type="number" min="1" value="'+(node.threshold??10)+'"></label>';
                 if(node.type==="storage")html+='<label>Reserve <input data-config="reserve" type="number" min="0" value="'+(node.reserve??100)+'"></label>';
                 if(node.type==="filter"){html+='<label>Ore tier <select data-config="tier">';ORE_TIERS.forEach(t=>{html+='<option value="'+t.tier+'" '+(Number(node.tier||1)===t.tier?"selected":"")+' >Tier '+t.tier+'</option>';});html+='</select></label>';}
+                if(node.type==="whitelist"||node.type==="blacklist"){html+='<label>Ore <select data-config="oreId">'+ORE_TIERS.flatMap(t=>t.ores).map(o=>'<option value="'+o.id+'" '+((node.oreId||"coal")===o.id?"selected":"")+'>'+o.name+'</option>').join("")+'</select></label>';}
                 if(["crusher","smelter","refinery","resonator"].includes(node.type)){
                     html+='<label>First tier <select data-config="tierStart">';
                     ORE_TIERS.forEach(t=>{html+='<option value="'+t.tier+'" '+(Number(node.tierStart||3)===t.tier?"selected":"")+' >Tier '+t.tier+'</option>';});
