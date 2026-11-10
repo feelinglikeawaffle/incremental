@@ -816,8 +816,8 @@
             // Multi Ore Chance
             const multiLvl = game.upgrades["m_multi"] || 0;
             const precisionLvl = game.upgrades["m_precision"] || 0;
-            game.minerMultiOreChance = UPGRADE_DEFINITIONS.find(u => u.id === "m_multi").effect(multiLvl) +
-                UPGRADE_DEFINITIONS.find(u => u.id === "m_precision").effect(precisionLvl);
+            game.minerMultiOreChance = Math.min(1, UPGRADE_DEFINITIONS.find(u => u.id === "m_multi").effect(multiLvl) +
+                UPGRADE_DEFINITIONS.find(u => u.id === "m_precision").effect(precisionLvl));
 
             // Luck Multiplier
             const scannerLvl = game.upgrades["l_scanner"] || 0;
@@ -1144,8 +1144,7 @@
             const purityLvl = game.upgrades["l_purity"] || 0;
             const purityMult = UPGRADE_DEFINITIONS.find(u => u.id === "l_purity").effect(purityLvl);
             
-            const autoBonus = game.autoSellEnabled ? UPGRADE_DEFINITIONS.find(u => u.id === "a_auto_bonus").effect(game.upgrades["a_auto_bonus"] || 0) : 1;
-            const totalWorth = baseVal * toSell * purityMult * game.marketMultiplier * (game.marketEventMultiplier || 1) * (1 + game.biddingNegotiationBonus) * game.prestigeMultipliers.cashMult * autoBonus;
+            const totalWorth = baseVal * toSell * purityMult * game.marketMultiplier * (game.marketEventMultiplier || 1) * (1 + game.biddingNegotiationBonus) * game.prestigeMultipliers.cashMult;
 
             game.inventory[oreId] -= toSell;
             game.totalOresSold += toSell;
