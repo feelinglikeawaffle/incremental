@@ -231,6 +231,18 @@
             font-family: Arial, sans-serif;
             font-weight: bold;
         }
+
+        /* Compact miner tiles, keeping the existing plain information-box style. */
+        #miners-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+            gap: 10px;
+            align-items: start;
+        }
+        #miners-grid .infobox { margin: 0 !important; min-width: 0; }
+        @media (max-width: 520px) {
+            #miners-grid { grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); }
+        }
     </style>
 </head>
 <body>
@@ -291,6 +303,10 @@
                     <td>Luck Rarity Multiplier:</td>
                     <td><span id="rig-stat-luck">1.00x</span></td>
                 </tr>
+                <tr>
+                    <td>Power Output:</td>
+                    <td><span id="rig-stat-power">1.00x</span> mining efficiency</td>
+                </tr>
             </table>
 
             <h3>Active Mining Nodes (<span id="rig-slots-label">1 / 1</span>)</h3>
@@ -310,6 +326,7 @@
 
             <div id="market-infobox" class="infobox">
                 <strong>Current Market Index:</strong> <span id="market-multiplier-text">1.10x</span> (<span id="market-trend-badge">STABLE</span>)
+                <br><strong>Market Event:</strong> <span id="market-event-status">No special event</span>
                 <br><br>
                 <label>
                     <input type="checkbox" id="toggle-autosell"> Enable Automated Continuous Liquidation (Auto-Seller)
@@ -360,7 +377,8 @@
                 <span data-upgrade-cat="mining" class="upg-cat-btn tab-btn active">Mining Efficiency</span> |
                 <span data-upgrade-cat="luck" class="upg-cat-btn tab-btn">Luck & Quality</span> |
                 <span data-upgrade-cat="market" class="upg-cat-btn tab-btn">Market & Negotiation</span> |
-                <span data-upgrade-cat="automation" class="upg-cat-btn tab-btn">Automation Systems</span>
+                <span data-upgrade-cat="automation" class="upg-cat-btn tab-btn">Automation Systems</span> |
+                <span data-upgrade-cat="power" class="upg-cat-btn tab-btn">Power & Grid</span>
             </div>
 
             <div id="upgrades-grid">
@@ -621,6 +639,21 @@
             }
         ];
 
+        /* New ore discoveries extend every existing tier without changing any original ore IDs. */
+        const EXTRA_ORES_BY_TIER = [
+            [{ id:"nickel", name:"Nickel Ore", value:12, weight:5, icon:"fa-coins", color:"#a3a3a3" }, { id:"sulfur", name:"Sulfur Deposit", value:5, weight:8, icon:"fa-fire", color:"#eab308" }],
+            [{ id:"tin", name:"Cassiterite Tin", value:80, weight:8, icon:"fa-cube", color:"#94a3b8" }, { id:"opal", name:"Fire Opal", value:900, weight:3, icon:"fa-gem", color:"#fb923c" }],
+            [{ id:"garnet", name:"Garnet Cluster", value:45000, weight:7, icon:"fa-gem", color:"#be123c" }, { id:"tungsten", name:"Tungsten Ore", value:100000, weight:5, icon:"fa-cube", color:"#64748b" }],
+            [{ id:"bismuth", name:"Bismuth Crystal", value:50000000, weight:5, icon:"fa-gem", color:"#c084fc" }, { id:"iridium", name:"Iridium Ore", value:80000000, weight:3, icon:"fa-circle", color:"#a1a1aa" }],
+            [{ id:"emberglass", name:"Emberglass", value:4000000000, weight:5, icon:"fa-fire", color:"#fb7185" }, { id:"bloodstone", name:"Magma Bloodstone", value:12000000000, weight:3, icon:"fa-gem", color:"#991b1b" }],
+            [{ id:"void_opal", name:"Void Opal", value:700000000000, weight:6, icon:"fa-gem", color:"#7c3aed" }, { id:"gravity_ore", name:"Graviton Ore", value:2500000000000, weight:3, icon:"fa-atom", color:"#312e81" }],
+            [{ id:"time_crystal", name:"Time Crystal", value:700000000000000, weight:6, icon:"fa-hourglass", color:"#f9a8d4" }, { id:"redshift_metal", name:"Redshift Metal", value:900000000000000, weight:3, icon:"fa-cube", color:"#be123c" }],
+            [{ id:"quasar_ore", name:"Quasar Ore", value:25000000000000000, weight:6, icon:"fa-star", color:"#f0abfc" }, { id:"blue_giant", name:"Blue Giant Crystal", value:90000000000000000, weight:3, icon:"fa-gem", color:"#38bdf8" }],
+            [{ id:"paradoxite", name:"Paradoxite", value:12000000000000000000, weight:6, icon:"fa-infinity", color:"#34d399" }, { id:"folded_matter", name:"Folded Matter", value:70000000000000000000, weight:3, icon:"fa-cubes", color:"#059669" }],
+            [{ id:"eternium", name:"Eternium", value:80000000000000000000000, weight:6, icon:"fa-gem", color:"#fda4af" }, { id:"origin_core", name:"Origin Core", value:500000000000000000000000, weight:3, icon:"fa-atom", color:"#fff1f2" }]
+        ];
+        ORE_TIERS.forEach((tier, index) => tier.ores.push(...(EXTRA_ORES_BY_TIER[index] || [])));
+
         /* --- GAME STATE OBJECT --- */
         const game = {
             cash: 0,
@@ -639,12 +672,18 @@
             
             // Power Outage Event
             powerOutageActive: false,
+            powerOutputMult: 1.0,
+            powerStability: 0,
 
             // Luck & Quality
             luckMultiplier: 1.0,
 
             // Market stats
             marketMultiplier: 1.1,
+            marketEventMultiplier: 1.0,
+            marketEventName: "No special event",
+            marketEventTimeRemaining: 0,
+            marketEventBonusDuration: 1.0,
             autoSellEnabled: false,
             biddingNegotiationBonus: 0.0,
 
@@ -680,18 +719,31 @@
             { id: "m_speed", cat: "mining", name: "Drill Motor Overclock", desc: "Decreases miner cycle speed by 8%.", baseCost: 15, costMult: 1.5, maxLvl: 50, effect: (lvl) => 1 + (lvl * 0.08) },
             { id: "m_slots", cat: "mining", name: "Rig Bay Expansion", desc: "Adds +1 maximum auto miner slot.", baseCost: 100, costMult: 3.5, maxLvl: 20, effect: (lvl) => lvl },
             { id: "m_multi", cat: "mining", name: "Dual-Chamber Excavator", desc: "Grants +5% chance to extract double ore per rock.", baseCost: 250, costMult: 2.2, maxLvl: 20, effect: (lvl) => lvl * 0.05 },
+            { id: "m_drill_force", cat: "mining", name: "High-Torque Drill Assembly", desc: "Increases mining speed by 6% per level.", baseCost: 450, costMult: 1.85, maxLvl: 35, effect: (lvl) => 1 + lvl * 0.06 },
+            { id: "m_precision", cat: "mining", name: "Precision Extraction Heads", desc: "Adds +1.5% chance to extract an extra ore per level.", baseCost: 900, costMult: 2.0, maxLvl: 25, effect: (lvl) => lvl * 0.015 },
 
             // LUCK & QUALITY CATEGORY
             { id: "l_scanner", cat: "luck", name: "Spectrometric Ore Scanner", desc: "Increases overall rare ore drop luck by +15%.", baseCost: 100, costMult: 1.8, maxLvl: 30, effect: (lvl) => 1 + (lvl * 0.15) },
             { id: "l_purity", cat: "luck", name: "Vein Purity Probe", desc: "Increases baseline value of all mined ores by +20%.", baseCost: 300, costMult: 2.0, maxLvl: 50, effect: (lvl) => 1 + (lvl * 0.20) },
+            { id: "l_deep_scan", cat: "luck", name: "Deep-Strata Resonance Scanner", desc: "Improves rare mineral weighting by 8% per level.", baseCost: 650, costMult: 1.9, maxLvl: 30, effect: (lvl) => 1 + lvl * 0.08 },
+            { id: "l_crystal_focus", cat: "luck", name: "Crystal Signature Analysis", desc: "Further improves rare deposit odds by 5% per level.", baseCost: 1800, costMult: 2.05, maxLvl: 25, effect: (lvl) => 1 + lvl * 0.05 },
 
             // MARKET CATEGORY
             { id: "mk_negotiator", cat: "market", name: "Market Broker Contracts", desc: "Permanently boosts base selling margin by +10%.", baseCost: 200, costMult: 1.9, maxLvl: 40, effect: (lvl) => lvl * 0.10 },
             { id: "mk_contract_payout", cat: "market", name: "Corporate Supply Deals", desc: "Increases bonus reward payout for fulfillable contracts by +25%.", baseCost: 1000, costMult: 2.5, maxLvl: 20, effect: (lvl) => 1 + (lvl * 0.25) },
+            { id: "mk_bulk_broker", cat: "market", name: "Bulk Export Brokerage", desc: "Adds +5% to all ore sale negotiations per level.", baseCost: 1600, costMult: 1.95, maxLvl: 30, effect: (lvl) => lvl * 0.05 },
+            { id: "mk_event_forecast", cat: "market", name: "Commodity Forecast Desk", desc: "Market events last 15% longer per level.", baseCost: 3500, costMult: 2.1, maxLvl: 20, effect: (lvl) => 1 + lvl * 0.15 },
 
             // AUTOMATION CATEGORY
             { id: "a_autosell", cat: "automation", name: "Automated Logistics Hub", desc: "Unlocks global Auto-Seller switch for continuous inventory liquidation.", baseCost: 500, costMult: 1.0, maxLvl: 1, effect: (lvl) => lvl > 0 },
-            { id: "a_contract_auto", cat: "automation", name: "Automated Contract Fulfillment", desc: "Automatically submits stored inventory to active bidding contracts when target is met.", baseCost: 50000, costMult: 1.0, maxLvl: 1, effect: (lvl) => lvl > 0 }
+            { id: "a_contract_auto", cat: "automation", name: "Automated Contract Fulfillment", desc: "Automatically submits stored inventory to active bidding contracts when target is met.", baseCost: 50000, costMult: 1.0, maxLvl: 1, effect: (lvl) => lvl > 0 },
+            { id: "a_quick_sell", cat: "automation", name: "Rapid Liquidation Relay", desc: "Runs automated inventory sales more frequently.", baseCost: 12000, costMult: 2.0, maxLvl: 5, effect: (lvl) => Math.max(0.2, 1 - lvl * 0.16) },
+            { id: "a_auto_bonus", cat: "automation", name: "Premium Sales Routing", desc: "Automated sales receive +4% value per level.", baseCost: 18000, costMult: 2.2, maxLvl: 20, effect: (lvl) => 1 + lvl * 0.04 },
+
+            // POWER & GRID CATEGORY
+            { id: "p_generator", cat: "power", name: "Auxiliary Generator Bank", desc: "Increases grid output and mining efficiency by 5% per level.", baseCost: 700, costMult: 1.9, maxLvl: 30, effect: (lvl) => 1 + lvl * 0.05 },
+            { id: "p_stabilizer", cat: "power", name: "Grid Stabilizer Array", desc: "Reduces the chance of power outages by 4 percentage points per level.", baseCost: 1400, costMult: 2.0, maxLvl: 20, effect: (lvl) => Math.min(0.8, lvl * 0.04) },
+            { id: "p_overdrive", cat: "power", name: "Reactor Overdrive", desc: "Adds another 3% mining speed per level.", baseCost: 5000, costMult: 2.25, maxLvl: 25, effect: (lvl) => 1 + lvl * 0.03 }
         ];
 
         /* --- PRESTIGE PERKS DEFINITIONS --- */
@@ -750,7 +802,12 @@
             const speedLvl = game.upgrades["m_speed"] || 0;
             const speedUpgMult = UPGRADE_DEFINITIONS.find(u => u.id === "m_speed").effect(speedLvl);
             const prestigeSpeedMult = 1 + ((game.prestigePerks["p_hyper_speed"] || 0) * 0.25);
-            game.minerSpeedMult = speedUpgMult * prestigeSpeedMult;
+            const drillForceMult = UPGRADE_DEFINITIONS.find(u => u.id === "m_drill_force").effect(game.upgrades["m_drill_force"] || 0);
+            const generatorMult = UPGRADE_DEFINITIONS.find(u => u.id === "p_generator").effect(game.upgrades["p_generator"] || 0);
+            const overdriveMult = UPGRADE_DEFINITIONS.find(u => u.id === "p_overdrive").effect(game.upgrades["p_overdrive"] || 0);
+            game.powerOutputMult = generatorMult * overdriveMult;
+            game.minerSpeedMult = speedUpgMult * drillForceMult * prestigeSpeedMult * game.powerOutputMult;
+            game.powerStability = UPGRADE_DEFINITIONS.find(u => u.id === "p_stabilizer").effect(game.upgrades["p_stabilizer"] || 0);
 
             // Calculate Slots
             const slotsLvl = game.upgrades["m_slots"] || 0;
@@ -758,17 +815,23 @@
 
             // Multi Ore Chance
             const multiLvl = game.upgrades["m_multi"] || 0;
-            game.minerMultiOreChance = UPGRADE_DEFINITIONS.find(u => u.id === "m_multi").effect(multiLvl);
+            const precisionLvl = game.upgrades["m_precision"] || 0;
+            game.minerMultiOreChance = UPGRADE_DEFINITIONS.find(u => u.id === "m_multi").effect(multiLvl) +
+                UPGRADE_DEFINITIONS.find(u => u.id === "m_precision").effect(precisionLvl);
 
             // Luck Multiplier
             const scannerLvl = game.upgrades["l_scanner"] || 0;
             const upgLuck = UPGRADE_DEFINITIONS.find(u => u.id === "l_scanner").effect(scannerLvl);
             const prestigeLuck = 1 + ((game.prestigePerks["p_cosmic_luck"] || 0) * 0.50);
-            game.luckMultiplier = upgLuck * prestigeLuck;
+            const deepScanMult = UPGRADE_DEFINITIONS.find(u => u.id === "l_deep_scan").effect(game.upgrades["l_deep_scan"] || 0);
+            const crystalFocusMult = UPGRADE_DEFINITIONS.find(u => u.id === "l_crystal_focus").effect(game.upgrades["l_crystal_focus"] || 0);
+            game.luckMultiplier = upgLuck * prestigeLuck * deepScanMult * crystalFocusMult;
 
             // Market Negotiation
             const negLvl = game.upgrades["mk_negotiator"] || 0;
-            game.biddingNegotiationBonus = UPGRADE_DEFINITIONS.find(u => u.id === "mk_negotiator").effect(negLvl);
+            game.biddingNegotiationBonus = UPGRADE_DEFINITIONS.find(u => u.id === "mk_negotiator").effect(negLvl) +
+                UPGRADE_DEFINITIONS.find(u => u.id === "mk_bulk_broker").effect(game.upgrades["mk_bulk_broker"] || 0);
+            game.marketEventBonusDuration = UPGRADE_DEFINITIONS.find(u => u.id === "mk_event_forecast").effect(game.upgrades["mk_event_forecast"] || 0);
 
             // Global Cash Multiplier
             const globalPrestigeMult = 1 + ((game.prestigePerks["p_global_yield"] || 0) * 1.0);
@@ -842,7 +905,8 @@
         }
 
         function checkPowerOutageEvent() {
-            if (!game.powerOutageActive && Math.random() < 0.15) { // 15% chance
+            const outageChance = Math.max(0.02, 0.15 - (game.powerStability || 0));
+            if (!game.powerOutageActive && Math.random() < outageChance) {
                 game.powerOutageActive = true;
                 const banner = document.getElementById("power-outage-banner");
                 if (banner) banner.classList.remove("hidden");
@@ -932,22 +996,57 @@
         let autoSellAccumulator = 0;
         function autoSellTick(dt) {
             autoSellAccumulator += dt;
-            if (autoSellAccumulator >= 1.0) {
+            const quickSellInterval = UPGRADE_DEFINITIONS.find(u => u.id === "a_quick_sell").effect(game.upgrades["a_quick_sell"] || 0);
+            if (autoSellAccumulator >= quickSellInterval) {
                 autoSellAccumulator = 0;
                 sellAllInventory(true);
             }
         }
 
+        const MARKET_EVENTS = [
+            { name: "Industrial Boom", description: "Factories are buying aggressively.", multiplier: 1.45 },
+            { name: "Construction Rush", description: "Infrastructure demand boosts common metals.", multiplier: 1.30 },
+            { name: "Gemstone Craze", description: "Collectors are paying more for rare minerals.", multiplier: 1.55 },
+            { name: "Export Restrictions", description: "Ore shipments are delayed and prices soften.", multiplier: 0.78 },
+            { name: "Market Panic", description: "Buyers are holding back; prices fall.", multiplier: 0.68 },
+            { name: "Research Breakthrough", description: "Scientific demand raises mineral prices.", multiplier: 1.38 },
+            { name: "Supply Glut", description: "A surplus pushes prices down.", multiplier: 0.82 }
+        ];
+
+        function startMarketEvent() {
+            const event = MARKET_EVENTS[Math.floor(Math.random() * MARKET_EVENTS.length)];
+            game.marketEventName = event.name + " — " + event.description;
+            game.marketEventMultiplier = event.multiplier;
+            game.marketEventTimeRemaining = Math.floor((50 + Math.random() * 50) * (game.marketEventBonusDuration || 1));
+            logDrop("MARKET EVENT: " + event.name + "! " + event.description, event.multiplier >= 1 ? "#006600" : "#990000");
+        }
+
         function fluctuateMarket() {
             const delta = (Math.random() - 0.48) * 0.35;
             game.marketMultiplier = Math.max(0.8, Math.min(2.5, game.marketMultiplier + delta));
-            
+            if (game.marketEventTimeRemaining > 0) {
+                game.marketEventTimeRemaining = Math.max(0, game.marketEventTimeRemaining - 25);
+                if (game.marketEventTimeRemaining === 0) {
+                    game.marketEventMultiplier = 1.0;
+                    game.marketEventName = "No special event";
+                    logDrop("Market event ended. Prices return to the normal index.", "#555555");
+                }
+            } else if (Math.random() < 0.32) {
+                startMarketEvent();
+            }
+
             const badge = document.getElementById("market-trend-badge");
             const text = document.getElementById("market-multiplier-text");
             const infobox = document.getElementById("market-infobox");
+            const eventStatus = document.getElementById("market-event-status");
+            if (eventStatus) {
+                eventStatus.textContent = game.marketEventTimeRemaining > 0
+                    ? game.marketEventName + " (" + game.marketEventTimeRemaining + "s remaining)"
+                    : "No special event";
+            }
 
             if (badge && text) {
-                text.textContent = game.marketMultiplier.toFixed(2) + "x";
+                text.textContent = (game.marketMultiplier * (game.marketEventMultiplier || 1)).toFixed(2) + "x";
                 if (game.marketMultiplier >= 1.6) {
                     badge.textContent = `HIGH MARKET SURGE (+${((game.marketMultiplier - 1)*100).toFixed(0)}%)`;
                     if (infobox) infobox.className = "infobox market-surge";
@@ -1018,7 +1117,7 @@
                     if (o.id === game.activeContract.oreId) baseVal = o.value;
                 }));
 
-                const totalValue = baseVal * game.activeContract.requiredAmount * game.marketMultiplier * game.activeContract.bonusMultiplier * game.prestigeMultipliers.cashMult;
+                const totalValue = baseVal * game.activeContract.requiredAmount * game.marketMultiplier * (game.marketEventMultiplier || 1) * game.activeContract.bonusMultiplier * game.prestigeMultipliers.cashMult;
                 
                 addCash(totalValue);
                 logDrop(`CONTRACT FULFILLED! Earned ${formatMoney(totalValue)}`, "#006600");
@@ -1045,7 +1144,8 @@
             const purityLvl = game.upgrades["l_purity"] || 0;
             const purityMult = UPGRADE_DEFINITIONS.find(u => u.id === "l_purity").effect(purityLvl);
             
-            const totalWorth = baseVal * toSell * purityMult * game.marketMultiplier * (1 + game.biddingNegotiationBonus) * game.prestigeMultipliers.cashMult;
+            const autoBonus = game.autoSellEnabled ? UPGRADE_DEFINITIONS.find(u => u.id === "a_auto_bonus").effect(game.upgrades["a_auto_bonus"] || 0) : 1;
+            const totalWorth = baseVal * toSell * purityMult * game.marketMultiplier * (game.marketEventMultiplier || 1) * (1 + game.biddingNegotiationBonus) * game.prestigeMultipliers.cashMult * autoBonus;
 
             game.inventory[oreId] -= toSell;
             game.totalOresSold += toSell;
@@ -1065,7 +1165,8 @@
                 tier.ores.forEach(ore => {
                     const owned = game.inventory[ore.id] || 0;
                     if (owned > 0) {
-                        const worth = ore.value * owned * purityMult * game.marketMultiplier * (1 + game.biddingNegotiationBonus) * game.prestigeMultipliers.cashMult;
+                        const autoBonus = silent ? UPGRADE_DEFINITIONS.find(u => u.id === "a_auto_bonus").effect(game.upgrades["a_auto_bonus"] || 0) : 1;
+                        const worth = ore.value * owned * purityMult * game.marketMultiplier * (game.marketEventMultiplier || 1) * (1 + game.biddingNegotiationBonus) * game.prestigeMultipliers.cashMult * autoBonus;
                         totalEarned += worth;
                         itemsSold += owned;
                         game.inventory[ore.id] = 0;
@@ -1193,6 +1294,7 @@
             document.getElementById("rig-stat-speed").textContent = `${(game.minerBaseSpeed / game.minerSpeedMult).toFixed(2)}s`;
             document.getElementById("rig-stat-multi").textContent = `${(game.minerMultiOreChance * 100).toFixed(0)}%`;
             document.getElementById("rig-stat-luck").textContent = `${game.luckMultiplier.toFixed(2)}x`;
+            document.getElementById("rig-stat-power").textContent = `${game.powerOutputMult.toFixed(2)}x`;
             document.getElementById("rig-slots-label").textContent = `${game.minersCount} / ${game.minerMaxSlots}`;
 
             // Calculate pending ascension tokens
@@ -1369,7 +1471,7 @@
                     }
 
                     const row = document.createElement("tr");
-                    const oreValueCalculated = ore.value * game.marketMultiplier * (1 + game.biddingNegotiationBonus) * game.prestigeMultipliers.cashMult;
+                    const oreValueCalculated = ore.value * game.marketMultiplier * (game.marketEventMultiplier || 1) * (1 + game.biddingNegotiationBonus) * game.prestigeMultipliers.cashMult;
 
                     row.innerHTML = `
                         <td>Tier ${tier.tier}</td>
