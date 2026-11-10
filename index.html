@@ -1222,7 +1222,7 @@
             const g=ensureAutomationGraph(),powered=(game.powerRatios?.automation??0)>0,minersPowered=(game.powerRatios?.miners??1)>0;
             const reachable=new Set(["miners"]),queue=["miners"];
             while(queue.length){const id=queue.shift();g.links.filter(l=>l.from===id).forEach(l=>{if(!reachable.has(l.to)){reachable.add(l.to);queue.push(l.to);}});}
-            const nodeActive=n=>reachable.has(n.id)&&minersPowered&&(n.type==="contract"?((game.upgrades["a_contract_auto"]||0)>0&&game.automation?.policy==="balanced"&&(game.powerRatios?.contracts??0)>0):powered)&&(n.type!=="sell"||game.autoSellEnabled);
+            const nodeActive=n=>n.type==="miners"?minersPowered:(reachable.has(n.id)&&minersPowered&&(n.type==="contract"?((game.upgrades["a_contract_auto"]||0)>0&&game.automation?.policy==="balanced"&&(game.powerRatios?.contracts??0)>0):powered)&&(n.type!=="sell"||game.autoSellEnabled));
             const positions=n=>({x:n.x||0,y:n.y||0});
             let markup="";
             g.links.forEach((l,index)=>{
