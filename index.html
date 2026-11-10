@@ -258,6 +258,7 @@
         .auto-wire{stroke:#72777d}
         .auto-wire:hover{stroke:#36c;stroke-width:4}
         #automation-toolbar{background:#f8f9fa}
+        #tab-power > .infobox{display:block;width:100%;box-sizing:border-box;margin:12px 0}#power-plant-list .infobox{display:block;width:100%;box-sizing:border-box;margin:8px 0}#power-build-options{display:flex;flex-direction:column;align-items:flex-start;gap:5px;margin-top:6px}#power-build-options button{min-width:220px;text-align:left}
 
         #automation-wires{position:absolute;inset:0;width:100%;height:100%;pointer-events:auto;overflow:visible}
         .auto-wire{cursor:pointer;pointer-events:stroke}.auto-wire:hover{stroke:#f0c674;stroke-width:5}
@@ -318,6 +319,7 @@
     <div class="nav-bar">
         <strong>Navigation:</strong>
         <span data-tab="tab-rig" class="tab-btn active">Mining Rig</span> |
+        <span data-tab="tab-power" class="tab-btn">Power Grid</span> |
         <span data-tab="tab-inventory" class="tab-btn">Inventory & Market</span> |
         <span data-tab="tab-upgrades" class="tab-btn">Upgrades</span> |
         <span data-tab="tab-automation" class="tab-btn">Automation</span> |
@@ -353,11 +355,22 @@
                     <td>Luck Rarity Multiplier:</td>
                     <td><span id="rig-stat-luck">1.00x</span></td>
                 </tr>
-                <tr>
-                    <td>Power Generation:</td>
-                    <td><span id="rig-stat-power">10 W</span></td>
-                </tr>
             </table>
+            <h3>Active Mining Nodes (<span id="rig-slots-label">1 / 1</span>)</h3>
+            <div id="miners-grid">
+                <!-- Dynamic miners list with icons & progress phase indicators -->
+            </div>
+
+            <h3>Recent Excavation Activity Log</h3>
+            <div id="drop-log" class="log-box">
+                <div>> Automated rig initialized. Standby for excavation activity.</div>
+            </div>
+        </div>
+
+        <!-- POWER GRID TAB -->
+        <div id="tab-power" class="tab-content hidden">
+            <h2>Power Grid & Generation</h2>
+            <p>Manage generation, grid allocation, fuel policies and plant construction. Systems are stacked vertically for easier control.</p>
             <div class="infobox">
                 <h3>Electrical Power Grid</h3>
                 <p><strong>Generation:</strong> <span id="power-generated">10 W</span> | <strong>Demand:</strong> <span id="power-demand">6 W</span> | <strong>Available:</strong> <span id="power-surplus">4 W surplus</span></p>
@@ -369,15 +382,6 @@
                 </table>
                 <p><label>Power allocation priority: <select id="power-priority"><option value="miners">Mining first</option><option value="automation">Automation first</option><option value="contracts">Contracts first</option></select></label></p>
                 <p>Power is a shared budget. Output changes with daylight and fuel. Set priorities, build sources, and automate fuel selection. Connect whitelist/blacklist nodes into the miner line; bound whitelist nodes allow only their selected fuel, while blacklist nodes exclude it.</p><div id="power-plant-workshop" class="infobox"><h3>Power Plant Construction Mode</h3><p><button id="power-build-mode" type="button">Enter power building mode</button> <span id="power-build-status">Mode: normal</span></p><p>Available sources: <span id="power-build-options"></span></p><div id="power-plant-list"></div></div>
-            </div>
-            <h3>Active Mining Nodes (<span id="rig-slots-label">1 / 1</span>)</h3>
-            <div id="miners-grid">
-                <!-- Dynamic miners list with icons & progress phase indicators -->
-            </div>
-
-            <h3>Recent Excavation Activity Log</h3>
-            <div id="drop-log" class="log-box">
-                <div>> Automated rig initialized. Standby for excavation activity.</div>
             </div>
         </div>
 
@@ -1664,7 +1668,7 @@ function setupPowerPlantControls(){
             document.getElementById("rig-stat-luck").textContent = `${game.luckMultiplier.toFixed(2)}x`;
             const power = calculatePowerAllocation();
             updatePowerPlantBuildButtons();
-            document.getElementById("rig-stat-power").textContent = formatNumber(power.generated) + " W";
+            const rigPowerStat=document.getElementById("rig-stat-power"); if(rigPowerStat)rigPowerStat.textContent = formatNumber(power.generated) + " W";
             const put = (id,value) => { const el=document.getElementById(id); if(el) el.textContent=value; };
             put("power-generated",formatNumber(power.generated)+" W"); put("power-demand",formatNumber(power.demand)+" W");
             put("power-surplus",power.surplus>=0?formatNumber(power.surplus)+" W surplus":formatNumber(-power.surplus)+" W shortfall");
@@ -1721,6 +1725,7 @@ function setupPowerPlantControls(){
                     document.querySelectorAll(".tab-content").forEach(panel => panel.classList.add("hidden"));
                     target.classList.remove("hidden");
                     if (targetTab === "tab-inventory") renderInventoryGrid();
+                    if (targetTab === "tab-power") { renderPowerPlants(); updateUIHUD(); }
                     if (targetTab === "tab-upgrades") {
                         const activeCategory = document.querySelector(".upg-cat-btn.active")?.getAttribute("data-upgrade-cat") || "mining";
                         renderUpgradesGrid(activeCategory);
