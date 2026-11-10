@@ -384,6 +384,29 @@
             <div id="upgrades-grid">
                 <!-- JS populated upgrades list -->
             </div>
+
+            <div id="automation-control-panel" class="infobox">
+                <h3>Automation Control & Wiring Board</h3>
+                <p>Connect the production line to decide where mined material flows. Disconnected lines stop that stage of automation.</p>
+                <table class="wikitable">
+                    <tr><th>Connection</th><th>Wire</th><th>Function</th></tr>
+                    <tr><td>Miner Bus → Ore Sorter</td><td><input type="checkbox" id="wire-miner-sorter" checked></td><td>Feeds mined ore into automation.</td></tr>
+                    <tr><td>Ore Sorter → Market Router</td><td><input type="checkbox" id="wire-sorter-market" checked></td><td>Allows the sorter to route surplus ore for sale.</td></tr>
+                    <tr><td>Ore Sorter → Contract Terminal</td><td><input type="checkbox" id="wire-sorter-contract" checked></td><td>Allows automated contract fulfillment.</td></tr>
+                    <tr><td>Ore Sorter → Storage Vault</td><td><input type="checkbox" id="wire-sorter-vault" checked></td><td>Preserves configured reserve quantities.</td></tr>
+                    <tr><td>Market Router → Liquidation Relay</td><td><input type="checkbox" id="wire-market-liquidator" checked></td><td>Executes automated sales.</td></tr>
+                </table>
+                <p><label>Routing policy:
+                    <select id="automation-policy">
+                        <option value="balanced">Balanced (contracts first, then sell surplus)</option>
+                        <option value="sell">Sell surplus first</option>
+                        <option value="stockpile">Stockpile (do not auto-sell)</option>
+                    </select>
+                </label></p>
+                <p><label>Reserve per ore type: <input type="number" id="automation-reserve" min="0" max="1000000" value="0" style="width:90px"></label>
+                <label>Minimum sale batch: <input type="number" id="automation-batch" min="1" max="1000000" value="1" style="width:90px"></label></p>
+                <p><strong>Line status:</strong> <span id="automation-line-status">All connections active.</span></p>
+            </div>
         </div>
 
         <!-- TAB 4: DEPTH STRATA -->
@@ -674,6 +697,12 @@
             powerOutageActive: false,
             powerOutputMult: 1.0,
             powerStability: 0,
+            automation: {
+                wires: { minerSorter: true, sorterMarket: true, sorterContract: true, sorterVault: true, marketLiquidator: true },
+                policy: "balanced",
+                reserve: 0,
+                minBatch: 1
+            },
 
             // Luck & Quality
             luckMultiplier: 1.0,
@@ -739,6 +768,9 @@
             { id: "a_contract_auto", cat: "automation", name: "Automated Contract Fulfillment", desc: "Automatically submits stored inventory to active bidding contracts when target is met.", baseCost: 50000, costMult: 1.0, maxLvl: 1, effect: (lvl) => lvl > 0 },
             { id: "a_quick_sell", cat: "automation", name: "Rapid Liquidation Relay", desc: "Runs automated inventory sales more frequently.", baseCost: 12000, costMult: 2.0, maxLvl: 5, effect: (lvl) => Math.max(0.2, 1 - lvl * 0.16) },
             { id: "a_auto_bonus", cat: "automation", name: "Premium Sales Routing", desc: "Automated sales receive +4% value per level.", baseCost: 18000, costMult: 2.2, maxLvl: 20, effect: (lvl) => 1 + lvl * 0.04 },
+            { id: "a_smart_sorter", cat: "automation", name: "Optical Ore Sorter", desc: "Increases the amount of surplus ore routed through automation by 10% per level (improves sale efficiency).", baseCost: 24000, costMult: 2.15, maxLvl: 15, effect: (lvl) => 1 + lvl * 0.10 },
+            { id: "a_buffer", cat: "automation", name: "Capacitor Buffer Banks", desc: "Reduces the minimum batch required by the automated liquidation line by 1 per level, to a minimum of 1.", baseCost: 30000, costMult: 2.0, maxLvl: 10, effect: (lvl) => lvl },
+            { id: "a_contract_scanner", cat: "automation", name: "Contract Signal Scanner", desc: "Automated contract routing checks for ready orders more frequently and adds +5% contract payout per level.", baseCost: 42000, costMult: 2.2, maxLvl: 20, effect: (lvl) => 1 + lvl * 0.05 },
 
             // POWER & GRID CATEGORY
             { id: "p_generator", cat: "power", name: "Auxiliary Generator Bank", desc: "Increases grid output and mining efficiency by 5% per level.", baseCost: 700, costMult: 1.9, maxLvl: 30, effect: (lvl) => 1 + lvl * 0.05 },
@@ -984,7 +1016,9 @@
 
             // Auto fulfill contract check
             const contractAuto = game.upgrades["a_contract_auto"] || 0;
-            if (contractAuto > 0 && game.activeContract) {
+            const contractWireConnected = game.automation?.wires?.minerSorter !== false &&
+                game.automation?.wires?.sorterContract !== false;
+            if (contractAuto > 0 && contractWireConnected && game.activeContract) {
                 if (game.inventory[game.activeContract.oreId] >= game.activeContract.requiredAmount) {
                     fulfillContract();
                 }
@@ -995,12 +1029,72 @@
 
         let autoSellAccumulator = 0;
         function autoSellTick(dt) {
+            const wires = game.automation?.wires || {};
+            if (!wires.minerSorter || !wires.sorterMarket || !wires.marketLiquidator || game.automation?.policy === "stockpile") return;
             autoSellAccumulator += dt;
             const quickSellInterval = UPGRADE_DEFINITIONS.find(u => u.id === "a_quick_sell").effect(game.upgrades["a_quick_sell"] || 0);
             if (autoSellAccumulator >= quickSellInterval) {
                 autoSellAccumulator = 0;
-                sellAllInventory(true);
+                const reserve = Math.max(0, Number(game.automation?.reserve) || 0);
+                const batch = Math.max(1, Number(game.automation?.minBatch) || 1);
+                let sellable = 0;
+                ORE_TIERS.forEach(t => t.ores.forEach(o => {
+                    sellable += Math.max(0, (game.inventory[o.id] || 0) - reserve);
+                }));
+                if (sellable >= batch) sellAllInventory(true, true);
             }
+        }
+
+        function setupAutomationControls() {
+            if (!game.automation) game.automation = {
+                wires: { minerSorter:true, sorterMarket:true, sorterContract:true, sorterVault:true, marketLiquidator:true },
+                policy:"balanced", reserve:0, minBatch:1
+            };
+            if (!game.automation.wires) game.automation.wires = {};
+            const wireMap = {
+                "wire-miner-sorter":"minerSorter",
+                "wire-sorter-market":"sorterMarket",
+                "wire-sorter-contract":"sorterContract",
+                "wire-sorter-vault":"sorterVault",
+                "wire-market-liquidator":"marketLiquidator"
+            };
+            Object.entries(wireMap).forEach(([elementId,key]) => {
+                const el = document.getElementById(elementId);
+                if (!el) return;
+                el.checked = game.automation.wires[key] !== false;
+                el.addEventListener("change", () => {
+                    game.automation.wires[key] = el.checked;
+                    updateAutomationLineStatus();
+                    saveGame();
+                });
+            });
+            const policy = document.getElementById("automation-policy");
+            const reserve = document.getElementById("automation-reserve");
+            const batch = document.getElementById("automation-batch");
+            if (policy) {
+                policy.value = game.automation.policy || "balanced";
+                policy.addEventListener("change", () => { game.automation.policy = policy.value; saveGame(); });
+            }
+            if (reserve) {
+                reserve.value = Math.max(0, game.automation.reserve || 0);
+                reserve.addEventListener("change", () => { game.automation.reserve = Math.max(0, Math.floor(Number(reserve.value) || 0)); reserve.value = game.automation.reserve; saveGame(); });
+            }
+            if (batch) {
+                batch.value = Math.max(1, game.automation.minBatch || 1);
+                batch.addEventListener("change", () => { game.automation.minBatch = Math.max(1, Math.floor(Number(batch.value) || 1)); batch.value = game.automation.minBatch; saveGame(); });
+            }
+            updateAutomationLineStatus();
+        }
+
+        function updateAutomationLineStatus() {
+            const w = game.automation?.wires || {};
+            const status = document.getElementById("automation-line-status");
+            if (!status) return;
+            const missing = [];
+            if (!w.minerSorter) missing.push("Miner Bus → Ore Sorter");
+            if (!w.sorterMarket) missing.push("Ore Sorter → Market Router");
+            if (!w.marketLiquidator) missing.push("Market Router → Liquidation Relay");
+            status.textContent = missing.length ? "Line interrupted: " + missing.join(", ") : "All connections active.";
         }
 
         const MARKET_EVENTS = [
@@ -1153,7 +1247,7 @@
             renderInventoryGrid();
         }
 
-        function sellAllInventory(silent = false) {
+        function sellAllInventory(silent = false, automated = false) {
             let totalEarned = 0;
             let itemsSold = 0;
 
@@ -1163,12 +1257,15 @@
             ORE_TIERS.forEach(tier => {
                 tier.ores.forEach(ore => {
                     const owned = game.inventory[ore.id] || 0;
-                    if (owned > 0) {
-                        const autoBonus = silent ? UPGRADE_DEFINITIONS.find(u => u.id === "a_auto_bonus").effect(game.upgrades["a_auto_bonus"] || 0) : 1;
-                        const worth = ore.value * owned * purityMult * game.marketMultiplier * (game.marketEventMultiplier || 1) * (1 + game.biddingNegotiationBonus) * game.prestigeMultipliers.cashMult * autoBonus;
+                    const reserve = automated ? Math.max(0, Number(game.automation?.reserve) || 0) : 0;
+                    const toSell = automated ? Math.max(0, owned - reserve) : owned;
+                    if (toSell > 0) {
+                        const sorterMult = automated ? UPGRADE_DEFINITIONS.find(u => u.id === "a_smart_sorter").effect(game.upgrades["a_smart_sorter"] || 0) : 1;
+                        const autoBonus = automated ? UPGRADE_DEFINITIONS.find(u => u.id === "a_auto_bonus").effect(game.upgrades["a_auto_bonus"] || 0) : 1;
+                        const worth = ore.value * toSell * purityMult * game.marketMultiplier * (game.marketEventMultiplier || 1) * (1 + game.biddingNegotiationBonus) * game.prestigeMultipliers.cashMult * autoBonus * sorterMult;
                         totalEarned += worth;
-                        itemsSold += owned;
-                        game.inventory[ore.id] = 0;
+                        itemsSold += toSell;
+                        game.inventory[ore.id] -= toSell;
                     }
                 });
             });
@@ -1303,18 +1400,24 @@
 
         function setupUI() {
             // TAB SWITCHING
-            const tabBtns = document.querySelectorAll(".tab-btn");
-            tabBtns.forEach(btn => {
+            // Main navigation and upgrade-category tabs are separate controls.
+            // Previously every .tab-btn was treated as a main tab; category clicks
+            // have no data-tab and caused a null target / render failure.
+            const mainTabBtns = document.querySelectorAll("[data-tab]");
+            mainTabBtns.forEach(btn => {
                 btn.addEventListener("click", () => {
-                    tabBtns.forEach(b => b.classList.remove("active"));
-                    btn.classList.add("active");
-
                     const targetTab = btn.getAttribute("data-tab");
-                    document.querySelectorAll(".tab-content").forEach(c => c.classList.add("hidden"));
-                    document.getElementById(targetTab).classList.remove("hidden");
-
+                    const target = document.getElementById(targetTab);
+                    if (!target) return;
+                    mainTabBtns.forEach(b => b.classList.remove("active"));
+                    btn.classList.add("active");
+                    document.querySelectorAll(".tab-content").forEach(panel => panel.classList.add("hidden"));
+                    target.classList.remove("hidden");
                     if (targetTab === "tab-inventory") renderInventoryGrid();
-                    if (targetTab === "tab-upgrades") renderUpgradesGrid("mining");
+                    if (targetTab === "tab-upgrades") {
+                        const activeCategory = document.querySelector(".upg-cat-btn.active")?.getAttribute("data-upgrade-cat") || "mining";
+                        renderUpgradesGrid(activeCategory);
+                    }
                     if (targetTab === "tab-depth") renderDepthTab();
                     if (targetTab === "tab-prestige") renderPrestigeTab();
                     if (targetTab === "tab-stats") renderCodex();
@@ -1340,6 +1443,7 @@
             // AUTO SELL TOGGLE
             const autoSellToggle = document.getElementById("toggle-autosell");
             autoSellToggle.checked = game.autoSellEnabled;
+            setupAutomationControls();
             autoSellToggle.addEventListener("change", (e) => {
                 const autoSellUnlocked = (game.upgrades["a_autosell"] || 0) > 0;
                 if (!autoSellUnlocked) {
@@ -1695,6 +1799,7 @@
                 totalOresSold: game.totalOresSold,
                 minersCount: game.minersCount,
                 autoSellEnabled: game.autoSellEnabled,
+                automation: game.automation,
                 prestigeTokens: game.prestigeTokens,
                 totalPrestigeResets: game.totalPrestigeResets,
                 inventory: game.inventory,
@@ -1713,6 +1818,7 @@
             try {
                 const parsed = JSON.parse(saved);
                 Object.assign(game, parsed);
+                if (!game.automation) game.automation = { wires: { minerSorter:true, sorterMarket:true, sorterContract:true, sorterVault:true, marketLiquidator:true }, policy:"balanced", reserve:0, minBatch:1 };
                 recalculateStats();
             } catch (e) {
                 console.error("Failed to load save data", e);
