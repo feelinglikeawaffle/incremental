@@ -963,8 +963,10 @@
         function calculatePowerAllocation() {
             const generated = (10 + (game.upgrades["p_generator"] || 0) * 8) * Math.pow(1.10, game.upgrades["p_overdrive"] || 0);
             const modules = game.automation?.modules || {}, wires = game.automation?.wires || {};
+            const splitPath = modules.splitter !== false && wires.sorterSplitter !== false && wires.splitterMarket !== false;
+            const marketRoute = wires.sorterMarket !== false || splitPath;
             const autoPath = game.autoSellEnabled && modules.sorter !== false && modules.market !== false && modules.liquidator !== false &&
-                wires.minerSorter !== false && wires.sorterMarket !== false && wires.marketLiquidator !== false && game.automation?.policy !== "stockpile";
+                wires.minerSorter !== false && marketRoute && wires.marketLiquidator !== false && game.automation?.policy !== "stockpile";
             const contractPath = (game.upgrades["a_contract_auto"] || 0) > 0 && modules.sorter !== false && modules.contract !== false &&
                 wires.minerSorter !== false && wires.sorterContract !== false && game.automation?.policy === "balanced";
             const demandByType = { miners: game.minersCount * 6, automation: autoPath ? 3 : 0, contracts: contractPath ? 2 : 0 };
@@ -982,7 +984,7 @@
             });
             game.powerRatios = ratios;
             const demand = demandByType.miners + demandByType.automation + demandByType.contracts;
-            return { generated, demand, surplus: generated - Math.min(generated, demand / efficiency), demandByType, ratios };
+            return { generated, demand, surplus: available, demandByType, ratios };
         }
 
         function updateMiners(dt) {
