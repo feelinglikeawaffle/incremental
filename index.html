@@ -1051,29 +1051,21 @@
             // Power is continuously budgeted and allocated; no random outage timer.
         }
 
+        const POWER_PLANT_TYPES={solar:{name:"Solar Array",watts:14,cost:250,rank:0,mode:"passive",desc:"Daylight-dependent passive output."},solarFarm:{name:"Solar Farm",watts:75,cost:18000,rank:8,mode:"passive",desc:"Large passive solar array."},coal:{name:"Coal Generator",watts:42,cost:2200,rank:3,mode:"fuel",fuel:"coal",rate:.35,desc:"Consumes coal from inventory."},nuclear:{name:"Nuclear Plant",watts:180,cost:180000,rank:6,mode:"fuel",fuel:"uranium",rate:.08,desc:"Consumes uranium from inventory."},geothermal:{name:"Geothermal Station",watts:95,cost:95000,rank:10,mode:"passive",desc:"Stable passive output."},fusion:{name:"Fusion Reactor",watts:650,cost:2500000,rank:10,mode:"passive",desc:"Very high passive output."}};
+        function powerPlantFuelAllowed(plant,id){return (plant.fuelPolicy||"whitelist")==="whitelist"?id===(plant.fuelOre||"coal"):id!==(plant.fuelOre||"coal");}
+        function tickPowerPlants(dt){game.powerClock=(game.powerClock||0)+dt;let output=0;(game.powerPlants||[]).forEach(p=>{if(!p.active)return;const spec=POWER_PLANT_TYPES[p.type];if(!spec)return;let factor=1;if(p.type==="solar"||p.type==="solarFarm")factor=.25+.75*(.5+.5*Math.sin((game.powerClock%120)/120*Math.PI*2));if(spec.mode==="fuel"){const id=spec.fuel;let consumed=0;if(powerPlantFuelAllowed(p,id)){const amount=Math.min(game.inventory[id]||0,spec.rate*dt);game.inventory[id]=(game.inventory[id]||0)-amount;consumed=amount;}factor=dt>0?Math.min(1,consumed/(spec.rate*dt)):((game.inventory[id]||0)>0?1:0);}output+=spec.watts*factor*(p.level||1);});game.powerPlantOutput=output;return output;}
         function calculatePowerAllocation() {
-            const generated = (10 + (game.upgrades["p_generator"] || 0) * 8) * Math.pow(1.10, game.upgrades["p_overdrive"] || 0) * coreRankBonuses().power;
-            const modules = game.automation?.modules || {}, wires = game.automation?.wires || {};
-            const autoPath = game.autoSellEnabled && automationHasPath("miners","sell") && game.automation?.policy !== "stockpile";
-            const contractPath = (game.upgrades["a_contract_auto"] || 0) > 0 && automationHasPath("miners","contract") && game.automation?.policy === "balanced";
-            const activeAutomationNodes=ensureAutomationGraph().nodes.filter(n=>n.type!=="miners"&&automationHasPath("miners",n.id)&&((n.type==="sell"&&automationHasPath(n.id,"sell"))||n.type!=="sell")).length;
-            const processPower=ensureAutomationGraph().nodes.filter(n=>["crusher","smelter","refinery","resonator"].includes(n.type)&&automationHasPath("miners",n.id)).reduce((sum,n)=>sum+({crusher:2,smelter:3,refinery:5,resonator:4}[n.type]||0),0);
-            const demandByType = { miners: game.minersCount * 6, automation: autoPath ? 2 + activeAutomationNodes + processPower : 0, contracts: contractPath ? 2 : 0 };
-            const efficiency = 1 + Math.min(0.25, (game.upgrades["p_stabilizer"] || 0) * 0.0125);
-            let available = generated;
-            const ratios = { miners:0, automation:0, contracts:0 };
-            const order = game.powerGrid?.priority === "automation" ? ["automation","miners","contracts"] :
-                game.powerGrid?.priority === "contracts" ? ["contracts","miners","automation"] : ["miners","automation","contracts"];
-            order.forEach(key => {
-                const need = demandByType[key];
-                if (!need) { ratios[key] = 1; return; }
-                const supplied = Math.min(need, available * efficiency);
-                ratios[key] = Math.max(0, Math.min(1, supplied / need));
-                available = Math.max(0, available - supplied / efficiency);
-            });
-            game.powerRatios = ratios;
-            const demand = demandByType.miners + demandByType.automation + demandByType.contracts;
-            return { generated, demand, surplus: available, demandByType, ratios };
+            const base=(10+(game.upgrades["p_generator"]||0)*8)*Math.pow(1.10,game.upgrades["p_overdrive"]||0)*coreRankBonuses().power;
+            const generated=base+(game.powerPlantOutput||0),g=ensureAutomationGraph();
+            const connected=id=>automationHasPath("miners",id)&&g.links.some(l=>l.to===id);
+            const autoPath=game.autoSellEnabled&&automationHasPath("miners","sell")&&game.automation?.policy!=="stockpile";
+            const contractPath=(game.upgrades["a_contract_auto"]||0)>0&&automationHasPath("miners","contract")&&game.automation?.policy==="balanced";
+            const activeNodes=g.nodes.filter(n=>n.type!=="miners"&&connected(n.id)&&((n.type!=="sell")||game.autoSellEnabled));
+            const processPower=activeNodes.filter(n=>["crusher","smelter","refinery","resonator"].includes(n.type)).reduce((sum,n)=>sum+({crusher:2,smelter:3,refinery:5,resonator:4}[n.type]||0),0);
+            const demandByType={miners:game.minersCount*6,automation:autoPath?2+activeNodes.length+processPower:0,contracts:contractPath?2:0},efficiency=1+Math.min(.25,(game.upgrades["p_stabilizer"]||0)*.0125);
+            let available=generated;const ratios={miners:0,automation:0,contracts:0},order=game.powerGrid?.priority==="automation"?["automation","miners","contracts"]:game.powerGrid?.priority==="contracts"?["contracts","miners","automation"]:["miners","automation","contracts"];
+            order.forEach(key=>{const need=demandByType[key];if(!need){ratios[key]=1;return;}const supplied=Math.min(need,available*efficiency);ratios[key]=Math.max(0,Math.min(1,supplied/need));available=Math.max(0,available-supplied/efficiency);});
+            game.powerRatios=ratios;const demand=demandByType.miners+demandByType.automation+demandByType.contracts;return {generated,demand,surplus:available,demandByType,ratios};
         }
 
         function updateMiners(dt) {
