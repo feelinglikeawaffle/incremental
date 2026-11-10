@@ -1034,6 +1034,7 @@
                 const dt = (now - lastTime) / 1000;
                 lastTime = now;
 
+                tickPowerPlants(dt);
                 const power = calculatePowerAllocation();
                 updateMiners(dt * (power.ratios.miners || 0));
                 if (game.autoSellEnabled && power.ratios.automation > 0) autoSellTick(dt * power.ratios.automation);
@@ -1054,7 +1055,23 @@
         const POWER_PLANT_TYPES={solar:{name:"Solar Array",watts:14,cost:250,rank:0,mode:"passive",desc:"Daylight-dependent passive output."},solarFarm:{name:"Solar Farm",watts:75,cost:18000,rank:8,mode:"passive",desc:"Large passive solar array."},coal:{name:"Coal Generator",watts:42,cost:2200,rank:3,mode:"fuel",fuel:"coal",rate:.35,desc:"Consumes coal from inventory."},nuclear:{name:"Nuclear Plant",watts:180,cost:180000,rank:6,mode:"fuel",fuel:"uranium",rate:.08,desc:"Consumes uranium from inventory."},geothermal:{name:"Geothermal Station",watts:95,cost:95000,rank:10,mode:"passive",desc:"Stable passive output."},fusion:{name:"Fusion Reactor",watts:650,cost:2500000,rank:10,mode:"passive",desc:"Very high passive output."}};
         function powerPlantFuelAllowed(plant,id){return (plant.fuelPolicy||"whitelist")==="whitelist"?id===(plant.fuelOre||"coal"):id!==(plant.fuelOre||"coal");}
         function tickPowerPlants(dt){game.powerClock=(game.powerClock||0)+dt;let output=0;(game.powerPlants||[]).forEach(p=>{if(!p.active)return;const spec=POWER_PLANT_TYPES[p.type];if(!spec)return;let factor=1;if(p.type==="solar"||p.type==="solarFarm")factor=.25+.75*(.5+.5*Math.sin((game.powerClock%120)/120*Math.PI*2));if(spec.mode==="fuel"){const id=spec.fuel;let consumed=0;if(powerPlantFuelAllowed(p,id)){const amount=Math.min(game.inventory[id]||0,spec.rate*dt);game.inventory[id]=(game.inventory[id]||0)-amount;consumed=amount;}factor=dt>0?Math.min(1,consumed/(spec.rate*dt)):((game.inventory[id]||0)>0?1:0);}output+=spec.watts*factor*(p.level||1);});game.powerPlantOutput=output;return output;}
-        function calculatePowerAllocation() {
+function setupPowerPlantControls(){
+            document.getElementById("power-build-mode")?.addEventListener("click",()=>{game.powerGrid.buildMode=!game.powerGrid.buildMode;document.getElementById("power-build-mode").textContent=game.powerGrid.buildMode?"Exit power building mode":"Enter power building mode";document.getElementById("power-build-status").textContent="Mode: "+(game.powerGrid.buildMode?"power construction":"normal");renderPowerPlants();});
+            renderPowerPlants();
+        }
+        function renderPowerPlants(){
+            const root=document.getElementById("power-plant-list"),opts=document.getElementById("power-build-options");if(!root||!opts)return;
+            const rank=getCoreRank(),available=Object.entries(POWER_PLANT_TYPES).filter(([,p])=>rank>=p.rank);
+            opts.innerHTML=available.map(([id,p])=>'<button data-build-power="'+id+'" '+(game.cash<p.cost||!game.powerGrid?.buildMode?'disabled':'')+'>'+p.name+' ('+formatMoney(p.cost)+')</button>').join(" ");
+            root.innerHTML=(game.powerPlants||[]).map(p=>{const spec=POWER_PLANT_TYPES[p.type];if(!spec)return "";return '<div class="infobox"><strong>'+p.name+'</strong> — '+(p.active?'Online':'Offline')+' · '+spec.watts+' W · '+spec.desc+'<br><label><input type="checkbox" data-plant-active="'+p.id+'" '+(p.active?'checked':'')+'> Enabled</label> '+(spec.mode==="fuel"?'<label>Fuel rule <select data-plant-policy="'+p.id+'"><option value="whitelist" '+((p.fuelPolicy||"whitelist")==="whitelist"?"selected":"")+'>Whitelist</option><option value="blacklist" '+(p.fuelPolicy==="blacklist"?"selected":"")+'>Blacklist</option></select></label> <label>Fuel <select data-plant-fuel="'+p.id+'"><option value="coal">Coal</option><option value="uranium">Uranium</option></select></label>':'Passive source')+' <button data-plant-remove="'+p.id+'">Dismantle</button></div>';}).join("");
+            root.querySelectorAll("[data-plant-active]").forEach(e=>e.addEventListener("change",()=>{const p=game.powerPlants.find(x=>x.id===Number(e.dataset.plantActive));if(p)p.active=e.checked;saveGame();}));
+            root.querySelectorAll("[data-plant-policy]").forEach(e=>e.addEventListener("change",()=>{const p=game.powerPlants.find(x=>x.id===Number(e.dataset.plantPolicy));if(p)p.fuelPolicy=e.value;saveGame();}));
+            root.querySelectorAll("[data-plant-fuel]").forEach(e=>e.addEventListener("change",()=>{const p=game.powerPlants.find(x=>x.id===Number(e.dataset.plantFuel));if(p)p.fuelOre=e.value;saveGame();}));
+            root.querySelectorAll("[data-plant-remove]").forEach(e=>e.addEventListener("click",()=>{game.powerPlants=game.powerPlants.filter(x=>x.id!==Number(e.dataset.plantRemove));saveGame();renderPowerPlants();}));
+            opts.querySelectorAll("[data-build-power]").forEach(e=>e.addEventListener("click",()=>{const id=e.dataset.buildPower,spec=POWER_PLANT_TYPES[id];if(!game.powerGrid.buildMode||!spec||game.cash<spec.cost||rank<spec.rank)return;game.cash-=spec.cost;game.powerPlants.push({id:game.nextPowerPlantId++,type:id,name:spec.name,level:1,active:true,fuelPolicy:"whitelist",fuelOre:spec.fuel||"coal"});saveGame();renderPowerPlants();updateUIHUD();}));
+        }
+
+                function calculatePowerAllocation() {
             const base=(10+(game.upgrades["p_generator"]||0)*8)*Math.pow(1.10,game.upgrades["p_overdrive"]||0)*coreRankBonuses().power;
             const generated=base+(game.powerPlantOutput||0),g=ensureAutomationGraph();
             const connected=id=>automationHasPath("miners",id)&&g.links.some(l=>l.to===id);
@@ -1219,6 +1236,7 @@
             if(policy){policy.value=game.automation.policy||"balanced";policy.addEventListener("change",()=>{game.automation.policy=policy.value;saveGame();});}
             setupAutomationGraph();
             setupAutomationZoom();
+            setupPowerPlantControls();
         }
         let automationPendingOutput=null,automationSelectedNode=null,automationNodeCounter=0;
         function setupAutomationGraph(){
@@ -1615,6 +1633,7 @@
             document.getElementById("rig-stat-multi").textContent = `${(game.minerMultiOreChance * 100).toFixed(0)}%`;
             document.getElementById("rig-stat-luck").textContent = `${game.luckMultiplier.toFixed(2)}x`;
             const power = calculatePowerAllocation();
+            renderPowerPlants();
             document.getElementById("rig-stat-power").textContent = formatNumber(power.generated) + " W";
             const put = (id,value) => { const el=document.getElementById(id); if(el) el.textContent=value; };
             put("power-generated",formatNumber(power.generated)+" W"); put("power-demand",formatNumber(power.demand)+" W");
@@ -2063,6 +2082,9 @@
                 autoSellEnabled: game.autoSellEnabled,
                 automation: game.automation,
                 powerGrid: game.powerGrid,
+                powerPlants: game.powerPlants,
+                nextPowerPlantId: game.nextPowerPlantId,
+                powerClock: game.powerClock,
                 prestigeTokens: game.prestigeTokens,
                 coreRanks: game.coreRanks,
                 totalPrestigeResets: game.totalPrestigeResets,
@@ -2086,6 +2108,8 @@
                 if (!game.automation) game.automation = {};
                 if (!game.automation.graph) game.automation.graph = defaultAutomationGraph();
                 if (!game.powerGrid) game.powerGrid = { priority:"miners" };
+                if (!Array.isArray(game.powerPlants)) game.powerPlants=[{id:1,type:"solar",name:"Solar Array",level:1,active:true,fuelPolicy:"whitelist",fuelOre:"coal"}];
+                game.nextPowerPlantId=game.nextPowerPlantId||Math.max(0,...game.powerPlants.map(p=>p.id||0))+1;
                 recalculateStats();
             } catch (e) {
                 console.error("Failed to load save data", e);
