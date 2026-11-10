@@ -368,7 +368,7 @@
                     <tr><td>Contract terminal</td><td id="power-contract-demand">0 W</td><td id="power-contract-allocated">0 W</td><td id="power-contract-status">Standby</td></tr>
                 </table>
                 <p><label>Power allocation priority: <select id="power-priority"><option value="miners">Mining first</option><option value="automation">Automation first</option><option value="contracts">Contracts first</option></select></label></p>
-                <p>Power is a shared budget. Output changes with daylight and fuel. Set priorities, build sources, and automate fuel selection.</p><div id="power-plant-workshop" class="infobox"><h3>Power Plant Construction Mode</h3><p><button id="power-build-mode" type="button">Enter power building mode</button> <span id="power-build-status">Mode: normal</span></p><p>Available sources: <span id="power-build-options"></span></p><div id="power-plant-list"></div></div>
+                <p>Power is a shared budget. Output changes with daylight and fuel. Set priorities, build sources, and automate fuel selection. Connect whitelist/blacklist nodes into the miner line; bound whitelist nodes allow only their selected fuel, while blacklist nodes exclude it.</p><div id="power-plant-workshop" class="infobox"><h3>Power Plant Construction Mode</h3><p><button id="power-build-mode" type="button">Enter power building mode</button> <span id="power-build-status">Mode: normal</span></p><p>Available sources: <span id="power-build-options"></span></p><div id="power-plant-list"></div></div>
             </div>
             <h3>Active Mining Nodes (<span id="rig-slots-label">1 / 1</span>)</h3>
             <div id="miners-grid">
@@ -1064,7 +1064,10 @@
         }
         function tickPowerPlants(dt){game.powerClock=(game.powerClock||0)+dt;let output=0;(game.powerPlants||[]).forEach(p=>{if(!p.active)return;const spec=POWER_PLANT_TYPES[p.type];if(!spec)return;let factor=1;if(p.type==="solar"||p.type==="solarFarm")factor=.25+.75*(.5+.5*Math.sin((game.powerClock%120)/120*Math.PI*2));if(spec.mode==="fuel"){const id=spec.fuel;let consumed=0;if(powerPlantFuelAllowed(p,id)){const amount=Math.min(game.inventory[id]||0,spec.rate*dt);game.inventory[id]=(game.inventory[id]||0)-amount;consumed=amount;}factor=dt>0?Math.min(1,consumed/(spec.rate*dt)):((game.inventory[id]||0)>0?1:0);}output+=spec.watts*factor*(p.level||1);});game.powerPlantOutput=output;return output;}
 function setupPowerPlantControls(){
-            document.getElementById("power-build-mode")?.addEventListener("click",()=>{game.powerGrid.buildMode=!game.powerGrid.buildMode;document.getElementById("power-build-mode").textContent=game.powerGrid.buildMode?"Exit power building mode":"Enter power building mode";document.getElementById("power-build-status").textContent="Mode: "+(game.powerGrid.buildMode?"power construction":"normal");renderPowerPlants();});
+            const button=document.getElementById("power-build-mode");
+            if(button)button.addEventListener("click",()=>{game.powerGrid.buildMode=!game.powerGrid.buildMode;button.textContent=game.powerGrid.buildMode?"Exit power building mode":"Enter power building mode";document.getElementById("power-build-status").textContent="Mode: "+(game.powerGrid.buildMode?"power construction":"normal");renderPowerPlants();});
+            if(button)button.textContent=game.powerGrid.buildMode?"Exit power building mode":"Enter power building mode";
+            document.getElementById("power-build-status").textContent="Mode: "+(game.powerGrid.buildMode?"power construction":"normal");
             renderPowerPlants();
         }
         function renderPowerPlants(){
@@ -1079,6 +1082,12 @@ function setupPowerPlantControls(){
             opts.querySelectorAll("[data-build-power]").forEach(e=>e.addEventListener("click",()=>{const id=e.dataset.buildPower,spec=POWER_PLANT_TYPES[id];if(!game.powerGrid.buildMode||!spec||game.cash<spec.cost||rank<spec.rank)return;game.cash-=spec.cost;game.powerPlants.push({id:game.nextPowerPlantId++,type:id,name:spec.name,level:1,active:true,fuelPolicy:"whitelist",fuelOre:spec.fuel||"coal"});saveGame();renderPowerPlants();updateUIHUD();}));
         }
 
+                function updatePowerPlantBuildButtons(){
+            const root=document.getElementById("power-build-options");if(!root)return;
+            const unlocked=Object.entries(POWER_PLANT_TYPES).filter(([,p])=>getCoreRank()>=p.rank);
+            if(root.children.length!==unlocked.length){renderPowerPlants();return;}
+            root.querySelectorAll("[data-build-power]").forEach(button=>{const spec=POWER_PLANT_TYPES[button.dataset.buildPower];button.disabled=!game.powerGrid.buildMode||!spec||game.cash<spec.cost;});
+        }
                 function calculatePowerAllocation() {
             const base=(10+(game.upgrades["p_generator"]||0)*8)*Math.pow(1.10,game.upgrades["p_overdrive"]||0)*coreRankBonuses().power;
             const generated=base+(game.powerPlantOutput||0),g=ensureAutomationGraph();
@@ -1645,6 +1654,7 @@ function setupPowerPlantControls(){
             document.getElementById("rig-stat-multi").textContent = `${(game.minerMultiOreChance * 100).toFixed(0)}%`;
             document.getElementById("rig-stat-luck").textContent = `${game.luckMultiplier.toFixed(2)}x`;
             const power = calculatePowerAllocation();
+            updatePowerPlantBuildButtons();
             document.getElementById("rig-stat-power").textContent = formatNumber(power.generated) + " W";
             const put = (id,value) => { const el=document.getElementById(id); if(el) el.textContent=value; };
             put("power-generated",formatNumber(power.generated)+" W"); put("power-demand",formatNumber(power.demand)+" W");
