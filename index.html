@@ -244,8 +244,11 @@
         @media (max-width: 520px) { #miners-grid { grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); } }
         #automation-editor{border:1px solid #a2a9b1;background:#fff;color:#202122;font-family:Arial,sans-serif}
         #automation-toolbar{background:#f8f9fa;color:#222;border-bottom:1px solid #a2a9b1;padding:8px;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
-        #automation-graph-viewport{height:590px;overflow:auto;position:relative;background-color:#f8f9fa;background-image:linear-gradient(rgba(0,0,0,.055) 1px,transparent 1px),linear-gradient(90deg,rgba(0,0,0,.055) 1px,transparent 1px);background-size:24px 24px;touch-action:pan-x pan-y}
-        #automation-graph{position:relative;width:1200px;height:760px}
+        #automation-graph-viewport{height:590px;overflow:auto;position:relative;background:#fff;touch-action:pan-x pan-y}
+        #automation-graph{position:relative;width:1200px;height:760px;transform-origin:top left}
+        .automation-zoom{display:flex;align-items:center;gap:5px;margin:5px 0;font-size:13px}
+        .automation-zoom button{padding:3px 9px;border:1px solid #a2a9b1;background:#f8f9fa;color:#202122}
+        .automation-zoom output{min-width:42px;text-align:center;font-variant-numeric:tabular-nums}
         #automation-wires{position:absolute;inset:0;width:100%;height:100%;pointer-events:auto;overflow:visible}
         .auto-wire{cursor:pointer;pointer-events:stroke}.auto-wire:hover{stroke:#f0c674;stroke-width:5}
         .auto-wire{fill:none;stroke:#62c88a;stroke-width:3}
@@ -262,14 +265,14 @@
         #automation-flow-viewport{height:340px;overflow:auto;border:1px solid #a2a9b1;background-color:#fbfcfd;background-image:linear-gradient(rgba(0,0,0,.045) 1px,transparent 1px),linear-gradient(90deg,rgba(0,0,0,.045) 1px,transparent 1px);background-size:24px 24px}
         #automation-flow-svg{display:block;width:1200px;min-width:1200px;height:760px}
         .flow-wire{fill:none;stroke:#a2a9b1;stroke-width:4;stroke-dasharray:7 6;opacity:.8}
-        .flow-wire.active{stroke:#29945a;stroke-width:5;stroke-dasharray:10 7;animation:flow-dash 1.2s linear infinite;opacity:1}
+        .flow-wire.active{stroke:#36c;stroke-width:4;stroke-dasharray:6 5;animation:flow-dash 1.8s linear infinite;opacity:1}
         .flow-wire.blocked{stroke:#c33;stroke-dasharray:4 6;opacity:.9}
         .flow-node{fill:#f1f3f5;stroke:#72777d;stroke-width:2}
-        .flow-node.active{fill:#e5f5e9;stroke:#25834d;stroke-width:3}
+        .flow-node.active{fill:#eef4ff;stroke:#36c;stroke-width:2}
         .flow-node.blocked{fill:#fff0f0;stroke:#b32424;stroke-width:3}
         .flow-node text{font: bold 16px Arial,sans-serif;fill:#202122}
         .flow-node .flow-sub{font:12px Arial,sans-serif;fill:#54595d;font-weight:normal}
-        .flow-particle{fill:#f0a52b;stroke:#805000;stroke-width:1.5}
+        .flow-particle{fill:#36c;stroke:#fff;stroke-width:1}
         #automation-flow-status{font:12px monospace;padding:7px;background:#f8f9fa;border-top:1px solid #a2a9b1}
         .core-rank-record{border:1px solid #a2a9b1;background:#f8f9fa;padding:9px;margin:8px 0}
         .core-rank-record.unlocked{border-left:5px solid #29945a;background:#f1faf3}
@@ -309,7 +312,7 @@
         <span data-tab="tab-upgrades" class="tab-btn">Upgrades</span> |
         <span data-tab="tab-automation" class="tab-btn">Automation</span> |
         <span data-tab="tab-depth" class="tab-btn">Depth Strata</span> |
-        <span data-tab="tab-prestige" class="tab-btn">Core Evolution</span> |
+        <span data-tab="tab-prestige" class="tab-btn">Core Ranks</span> |
         <span data-tab="tab-stats" class="tab-btn">Statistics & Codex</span>
     </div>
 
@@ -449,10 +452,12 @@
                         </select>
                         <button id="automation-add-node">Add Node</button><button id="automation-clear-link">Cancel Connection</button><button id="automation-reset-graph">Reset Example Graph</button>
                     </div>
+                    <div class="automation-zoom"><strong>Workshop zoom:</strong><button type="button" id="automation-zoom-out">−</button><output id="automation-zoom-level">100%</output><button type="button" id="automation-zoom-in">+</button><button type="button" id="automation-zoom-reset">Reset</button></div>
                     <div id="automation-graph-viewport"><div id="automation-graph"><svg id="automation-wires" viewBox="0 0 1200 760" aria-hidden="true"></svg></div></div>
                     <div id="automation-flow-panel" class="infobox">
                         <h3>Live Resource Flow</h3>
                         <p>Live production telemetry follows your actual workshop connections. Moving ore markers indicate an available resource stream; machine labels show current stock, lifetime extraction or sales, and power state.</p>
+                        <div class="automation-zoom"><strong>Flow zoom:</strong><button type="button" id="automation-flow-zoom-out">−</button><output id="automation-flow-zoom-level">100%</output><button type="button" id="automation-flow-zoom-in">+</button><button type="button" id="automation-flow-zoom-reset">Reset</button></div>
                         <div id="automation-flow-viewport"><svg id="automation-flow-svg" viewBox="0 0 1200 760" role="img" aria-label="Live resource flow diagram"></svg></div>
                         <div id="automation-flow-status" aria-live="polite">Waiting for automation status…</div>
                     </div>
@@ -487,20 +492,20 @@
 
         <!-- TAB 5: ASCENSION -->
         <div id="tab-prestige" class="tab-content hidden">
-            <h2>Core Evolution</h2>
+            <h2>Core Ranks</h2>
 
             <div class="infobox" style="background-color: #f0f0ff; border-color: #a0a0d0;">
                 <h3>Core Reformation Protocol</h3>
-                <p>Reform your facility to extract Rank I Core Essence. Reformation resets cash, miners, inventory, and standard upgrades, but preserves your Essence, research, and awakened Core Expansion ranks.</p>
+                <p>Reform your facility to earn Core Essence. Your lifetime Core Essence total determines your rank. Every new rank permanently unlocks a perk; ranks and their perks are never spent or lost on reformation.</p>
                 <p>Core Essence gained on reformation: <strong id="prestige-pending-tokens">0 Rank I</strong></p>
                 <button id="btn-do-prestige"><b>[ REFORM CORE ]</b></button>
             </div>
 
-            <h3>Core Expansion — Evolution Archive</h3>
-            <p>Core ranks are no longer merged or traded. Each rank is a permanent achievement earned through increasingly demanding facility milestones. Every rank awakens a unique, permanent core mutation. Your highest attained rank is retained through every reformation.</p>
+            <h3>Lifetime Rank Progress</h3>
+            <p>Ranks are earned automatically from the total Core Essence you have ever collected, including Essence already spent on research. No merging, demotion, or extra reset milestones.</p>
             <div id="core-rank-ladder"></div>
             <h3>Core Essence Research</h3>
-            <p>Rank I Core Essence remains the research currency for the original permanent upgrades. Higher evolution ranks grant their own automatic powers and cannot be purchased, demoted, or combined.</p>
+            <p>Spend your current Core Essence on the research upgrades below. Spending Essence does not reduce your lifetime rank progress.</p>
             <h3>Permanent Core Evolution Perks</h3>
             <div id="prestige-perks-grid">
                 <!-- JS populates ascension upgrades -->
@@ -782,6 +787,7 @@
             // Prestige
             prestigeTokens: 0,
             coreRanks: {1:0,2:0,3:0,4:0,5:0,6:0,7:0,8:0,9:0,10:0},
+            totalCoreEssenceEarned: 0,
             totalPrestigeResets: 0,
             prestigeMultipliers: {
                 cashMult: 1.0,
@@ -845,17 +851,17 @@
             { id: "p_cosmic_luck", name: "Cosmic Prospecting", desc: "+50% Rare Ore spawn luck multiplier.", baseCost: 3, costMult: 3.0, maxLvl: 10 }
         ];
 
-        const CORE_EXPANSION_RANKS = [
-            {name:"The First Spark",title:"I",resets:1,cash:100000,depth:1,rocks:0,perk:"Genesis Dividend",effect:"+10% all sale value.",cashMult:1.10},
-            {name:"Abyssal Heart",title:"II",resets:3,cash:1000000,depth:3,rocks:100,perk:"Mantle Breaker",effect:"+25% mining speed.",speedMult:1.25},
-            {name:"Fortune Singularity",title:"III",resets:5,cash:10000000,depth:4,rocks:1000,perk:"Impossible Prospect",effect:"+75% rare-ore luck.",luckMult:1.75},
-            {name:"Titan Foundry",title:"IV",resets:8,cash:100000000,depth:5,rocks:5000,perk:"Colossal Expansion",effect:"+2 permanent miner slots.",slots:2},
-            {name:"Market Eclipse",title:"V",resets:12,cash:1000000000,depth:6,rocks:25000,perk:"Golden Singularity",effect:"2x all sale value.",cashMult:2},
-            {name:"Eternal Reactor",title:"VI",resets:18,cash:10000000000,depth:7,rocks:100000,perk:"Infinite Grid",effect:"+100% power generation.",powerMult:2},
-            {name:"World-Eater Core",title:"VII",resets:25,cash:100000000000,depth:8,rocks:500000,perk:"Devouring Engine",effect:"All mining yields +1 extra ore.",extraOre:1},
-            {name:"Chrono Dominion",title:"VIII",resets:35,cash:1000000000000,depth:9,rocks:2000000,perk:"Broken Time",effect:"3x mining speed and 3x sale value.",speedMult:3,cashMult:3},
-            {name:"Starforged Sovereign",title:"IX",resets:50,cash:10000000000000,depth:10,rocks:10000000,perk:"Celestial Authority",effect:"5x luck, 5x power, +5 miner slots.",luckMult:5,powerMult:5,slots:5},
-            {name:"The Infinite",title:"X",resets:75,cash:100000000000000,depth:10,rocks:50000000,perk:"TOTALITY",effect:"10x sale value, 10x speed, 10x luck, +10 slots, 10x power.",cashMult:10,speedMult:10,luckMult:10,powerMult:10,slots:10}
+        const CORE_RANKS = [
+            {title:"I",name:"Prospector",essence:10,perk:"First Strike",effect:"+10% ore sale value.",cash:1.10},
+            {title:"II",name:"Drillhand",essence:25,perk:"Quick Turn",effect:"+10% mining speed.",speed:1.10},
+            {title:"III",name:"Surveyor",essence:50,perk:"Rare Signal",effect:"+15% rare ore luck.",luck:1.15},
+            {title:"IV",name:"Foreman",essence:100,perk:"Expanded Crew",effect:"+1 permanent miner slot.",slots:1},
+            {title:"V",name:"Broker",essence:200,perk:"Market Authority",effect:"+25% ore sale value.",cash:1.25},
+            {title:"VI",name:"Powerwright",essence:400,perk:"Overcapacity",effect:"+25% power generation.",power:1.25},
+            {title:"VII",name:"Deep Engineer",essence:800,perk:"Double Extraction",effect:"+10% chance for one additional ore.",multi:0.10},
+            {title:"VIII",name:"Master Driller",essence:1600,perk:"Rapid Descent",effect:"+25% mining speed.",speed:1.25},
+            {title:"IX",name:"Magnate",essence:3200,perk:"Industrial Empire",effect:"+2 permanent miner slots and +25% rare ore luck.",slots:2,luck:1.25},
+            {title:"X",name:"Core Sovereign",essence:6400,perk:"Absolute Yield",effect:"+50% sale value, mining speed, and power generation.",cash:1.50,speed:1.50,power:1.50}
         ];
 
         /* --- HELPER FUNCTIONS --- */
@@ -888,35 +894,26 @@
             for (let rank=1; rank<=10; rank++) game.coreRanks[rank] = Math.max(0, Math.floor(Number(game.coreRanks[rank]) || 0));
             game.coreRanks[1] = Math.max(game.coreRanks[1], Math.max(0, Math.floor(Number(game.prestigeTokens) || 0)));
             game.prestigeTokens = game.coreRanks[1];
-            game.coreExpansionRank = Math.max(0,Math.min(10,Math.floor(Number(game.coreExpansionRank)||0)));
+            const legacyRank=Math.max(0,Math.min(10,Math.floor(Number(game.coreExpansionRank)||0)));
+            game.totalCoreEssenceEarned=Math.max(0,Number(game.totalCoreEssenceEarned)||0);
+            if(!game.totalCoreEssenceEarned&&legacyRank)game.totalCoreEssenceEarned=CORE_RANKS[legacyRank-1].essence;
+            game.totalCoreEssenceEarned=Math.max(game.totalCoreEssenceEarned,game.prestigeTokens);
         }
 
-        function coreExpansionEligibleRank(resetsAhead=0) {
-            const resets=(game.totalPrestigeResets||0)+resetsAhead;
-            let rank=0;
-            CORE_EXPANSION_RANKS.forEach((r,i)=>{if(resets>=r.resets&&game.totalCashEarned>=r.cash&&game.unlockedTier>=r.depth&&game.totalRocksExcavated>=r.rocks)rank=i+1;});
-            return rank;
+        function getCoreRank() {
+            let rank=0;CORE_RANKS.forEach((r,i)=>{if((game.totalCoreEssenceEarned||0)>=r.essence)rank=i+1;});return rank;
         }
-
-        function coreExpansionBonuses() {
-            const total={cashMult:1,speedMult:1,luckMult:1,powerMult:1,slots:0,extraOre:0};
-            const rank=Math.max(0,Math.min(10,Number(game.coreExpansionRank)||0));
-            CORE_EXPANSION_RANKS.slice(0,rank).forEach(r=>{total.cashMult*=r.cashMult||1;total.speedMult*=r.speedMult||1;total.luckMult*=r.luckMult||1;total.powerMult*=r.powerMult||1;total.slots+=r.slots||0;total.extraOre+=r.extraOre||0;});
+        function coreRankBonuses() {
+            const total={cash:1,speed:1,luck:1,power:1,slots:0,multi:0};
+            CORE_RANKS.slice(0,getCoreRank()).forEach(r=>{total.cash*=r.cash||1;total.speed*=r.speed||1;total.luck*=r.luck||1;total.power*=r.power||1;total.slots+=r.slots||0;total.multi+=r.multi||0;});
             return total;
         }
-
         function renderCoreRanks() {
-            const root=document.getElementById("core-rank-ladder");
-            if (!root) return;
-            ensureCoreRanks();
-            const attained=game.coreExpansionRank||0,next=CORE_EXPANSION_RANKS[attained],eligible=coreExpansionEligibleRank();
-            let html='<div class="infobox"><strong>Highest attained rank:</strong> '+(attained?('Rank '+CORE_EXPANSION_RANKS[attained-1].title+' — '+CORE_EXPANSION_RANKS[attained-1].name):'Unawakened')+'<br><strong>Next awakening:</strong> '+(next?('Rank '+next.title+' — '+next.name):'All ten ranks attained')+'</div>';
-            CORE_EXPANSION_RANKS.forEach((r,i)=>{
-                const n=i+1,unlocked=n<=attained,canAwaken=n===attained+1&&eligible>=n;
-                const progress=Math.min(100,Math.max(0,Math.min((game.totalPrestigeResets||0)/r.resets,(game.totalCashEarned||0)/r.cash,(game.unlockedTier||1)/r.depth,(r.rocks===0?1:(game.totalRocksExcavated||0)/r.rocks))*100));
-                const state=unlocked?'unlocked':canAwaken?'current':'locked';
-                html+='<div class="core-rank-record '+state+'"><strong>Rank '+r.title+' — '+r.name+'</strong> '+(unlocked?'✓ ATTAINED':canAwaken?'★ READY TO AWAKEN':'· SEALED')+'<br><strong>Signature mutation:</strong> '+r.perk+' — '+r.effect+'<div class="core-rank-progress"><span style="width:'+progress+'%"></span></div><small>'+(game.totalPrestigeResets||0)+' / '+r.resets+' reformations · '+formatMoney(game.totalCashEarned)+' / '+formatMoney(r.cash)+' lifetime earnings · Tier '+(game.unlockedTier||1)+' / '+r.depth+' depth · '+formatNumber(game.totalRocksExcavated||0)+' / '+formatNumber(r.rocks)+' excavations</small></div>';
-            });
+            const root=document.getElementById("core-rank-ladder");if(!root)return;ensureCoreRanks();
+            const rank=getCoreRank(),next=CORE_RANKS[rank],total=game.totalCoreEssenceEarned||0;
+            let html='<p><strong>Current rank:</strong> '+(rank?('Rank '+CORE_RANKS[rank-1].title+' — '+CORE_RANKS[rank-1].name):'Unranked')+' · <strong>Lifetime Core Essence:</strong> '+formatNumber(total)+'</p>';
+            if(next)html+='<p><strong>Next rank:</strong> '+next.title+' — '+next.name+' ('+formatNumber(Math.max(0,next.essence-total))+' more lifetime Essence required)</p>';
+            CORE_RANKS.forEach((r,i)=>{const earned=i<rank,progress=Math.min(100,total/r.essence*100);html+='<div class="core-rank-record '+(earned?'unlocked':'locked')+'"><strong>Rank '+r.title+' — '+r.name+'</strong> '+(earned?'✓ UNLOCKED':'LOCKED')+'<br><strong>Perk: '+r.perk+'</strong> — '+r.effect+'<div class="core-rank-progress"><span style="width:'+progress+'%"></span></div><small>'+formatNumber(Math.min(total,r.essence))+' / '+formatNumber(r.essence)+' lifetime Core Essence</small></div>';});
             root.innerHTML=html;
         }
 
@@ -947,8 +944,8 @@
             const speedUpgMult = UPGRADE_DEFINITIONS.find(u => u.id === "m_speed").effect(speedLvl);
             const prestigeSpeedMult = 1 + ((game.prestigePerks["p_hyper_speed"] || 0) * 0.25);
             const drillForceMult = UPGRADE_DEFINITIONS.find(u => u.id === "m_drill_force").effect(game.upgrades["m_drill_force"] || 0);
-            const coreBonus = coreExpansionBonuses();
-            game.minerSpeedMult = speedUpgMult * drillForceMult * prestigeSpeedMult * coreBonus.speedMult;
+            const coreBonus = coreRankBonuses();
+            game.minerSpeedMult = speedUpgMult * drillForceMult * prestigeSpeedMult * coreBonus.speed;
             game.powerOutputMult = UPGRADE_DEFINITIONS.find(u => u.id === "p_overdrive").effect(game.upgrades["p_overdrive"] || 0);
             game.powerStability = UPGRADE_DEFINITIONS.find(u => u.id === "p_stabilizer").effect(game.upgrades["p_stabilizer"] || 0);
 
@@ -968,7 +965,7 @@
             const prestigeLuck = 1 + ((game.prestigePerks["p_cosmic_luck"] || 0) * 0.50);
             const deepScanMult = UPGRADE_DEFINITIONS.find(u => u.id === "l_deep_scan").effect(game.upgrades["l_deep_scan"] || 0);
             const crystalFocusMult = UPGRADE_DEFINITIONS.find(u => u.id === "l_crystal_focus").effect(game.upgrades["l_crystal_focus"] || 0);
-            game.luckMultiplier = upgLuck * prestigeLuck * deepScanMult * crystalFocusMult * coreBonus.luckMult;
+            game.luckMultiplier = upgLuck * prestigeLuck * deepScanMult * crystalFocusMult * coreBonus.luck;
 
             // Market Negotiation
             const negLvl = game.upgrades["mk_negotiator"] || 0;
@@ -978,7 +975,7 @@
 
             // Global Cash Multiplier
             const globalPrestigeMult = 1 + ((game.prestigePerks["p_global_yield"] || 0) * 1.0);
-            game.prestigeMultipliers.cashMult = globalPrestigeMult * coreBonus.cashMult;
+            game.prestigeMultipliers.cashMult = globalPrestigeMult * coreBonus.cash;
         }
 
         function syncMinerInstances() {
@@ -1044,7 +1041,7 @@
         }
 
         function calculatePowerAllocation() {
-            const generated = (10 + (game.upgrades["p_generator"] || 0) * 8) * Math.pow(1.10, game.upgrades["p_overdrive"] || 0) * coreExpansionBonuses().powerMult;
+            const generated = (10 + (game.upgrades["p_generator"] || 0) * 8) * Math.pow(1.10, game.upgrades["p_overdrive"] || 0) * coreRankBonuses().power;
             const modules = game.automation?.modules || {}, wires = game.automation?.wires || {};
             const autoPath = game.autoSellEnabled && automationHasPath("miners","sell") && game.automation?.policy !== "stockpile";
             const contractPath = (game.upgrades["a_contract_auto"] || 0) > 0 && automationHasPath("miners","contract") && game.automation?.policy === "balanced";
@@ -1123,8 +1120,8 @@
         function breakRock(ore, minerIdx) {
             game.totalRocksExcavated++;
 
-            let count = 1 + (coreExpansionBonuses().extraOre||0);
-            if (Math.random() < game.minerMultiOreChance) {
+            let count = 1;
+            if (Math.random() < Math.min(1,game.minerMultiOreChance+coreRankBonuses().multi)) {
                 count += 1;
             }
 
@@ -1198,12 +1195,27 @@
         function ensureAutomationGraph(){if(!game.automation)game.automation={};if(!game.automation.graph||!Array.isArray(game.automation.graph.nodes))game.automation.graph=defaultAutomationGraph();return game.automation.graph;}
         function automationHasPath(from,to){const g=ensureAutomationGraph(),seen=new Set([from]),q=[from];while(q.length){const id=q.shift();if(id===to)return true;g.links.filter(l=>l.from===id).forEach(l=>{if(!seen.has(l.to)){seen.add(l.to);q.push(l.to);}});}return false;}
         function automationNode(id){return ensureAutomationGraph().nodes.find(n=>n.id===id);}
+        let automationGraphZoom=1,automationFlowZoom=1;
+        function applyAutomationZoom(){
+            const graph=document.getElementById("automation-graph"),flow=document.getElementById("automation-flow-svg");
+            if(graph){graph.style.transform="scale("+automationGraphZoom+")";const o=document.getElementById("automation-zoom-level");if(o)o.textContent=Math.round(automationGraphZoom*100)+"%";}
+            if(flow){flow.style.width=(1200*automationFlowZoom)+"px";flow.style.height=(760*automationFlowZoom)+"px";const o=document.getElementById("automation-flow-zoom-level");if(o)o.textContent=Math.round(automationFlowZoom*100)+"%";}
+        }
+        function setupAutomationZoom(){
+            const bind=(id,delta,type)=>document.getElementById(id)?.addEventListener("click",()=>{if(type==="graph")automationGraphZoom=Math.max(.5,Math.min(1.75,automationGraphZoom+delta));else automationFlowZoom=Math.max(.5,Math.min(1.75,automationFlowZoom+delta));applyAutomationZoom();});
+            bind("automation-zoom-in",.1,"graph");bind("automation-zoom-out",-.1,"graph");
+            bind("automation-flow-zoom-in",.1,"flow");bind("automation-flow-zoom-out",-.1,"flow");
+            document.getElementById("automation-zoom-reset")?.addEventListener("click",()=>{automationGraphZoom=1;applyAutomationZoom();});
+            document.getElementById("automation-flow-zoom-reset")?.addEventListener("click",()=>{automationFlowZoom=1;applyAutomationZoom();});
+            applyAutomationZoom();
+        }
         function setupAutomationControls(){
             ensureAutomationGraph();
             const priority=document.getElementById("power-priority"),policy=document.getElementById("automation-policy");
             if(priority){priority.value=game.powerGrid?.priority||"miners";priority.addEventListener("change",()=>{game.powerGrid.priority=priority.value;saveGame();});}
             if(policy){policy.value=game.automation.policy||"balanced";policy.addEventListener("change",()=>{game.automation.policy=policy.value;saveGame();});}
             setupAutomationGraph();
+            setupAutomationZoom();
         }
         let automationPendingOutput=null,automationSelectedNode=null,automationNodeCounter=0;
         function setupAutomationGraph(){
@@ -1548,8 +1560,8 @@
             if (confirm(`Reform the facility now? Reset cash and standard upgrades to gain ${pending} Rank I Core Essence? Your Core Expansion milestones will also be evaluated.`)) {
                 ensureCoreRanks(); game.coreRanks[1] += pending; game.prestigeTokens = game.coreRanks[1];
                 game.totalPrestigeResets++;
-                const awakened=Math.max(game.coreExpansionRank||0,coreExpansionEligibleRank());
-                if(awakened>(game.coreExpansionRank||0)){game.coreExpansionRank=awakened;logDrop("CORE AWAKENING: Rank "+CORE_EXPANSION_RANKS[awakened-1].title+" — "+CORE_EXPANSION_RANKS[awakened-1].name+" has been attained!","#8a6500");}
+                const oldRank=getCoreRank();
+                game.totalCoreEssenceEarned=(game.totalCoreEssenceEarned||0)+pending;
 
                 // Reset standard stats
                 game.cash = 0;
@@ -1565,7 +1577,9 @@
                 renderCoreRanks();
                 renderPrestigeTab();
                 updateUIHUD();
-                logDrop(`CORE REFORMED! Granted ${pending} Rank I Core Essence.`, "#0000b3");
+                const newRank=getCoreRank();
+                if(newRank>oldRank)logDrop("NEW CORE RANK UNLOCKED: Rank "+CORE_RANKS[newRank-1].title+" — "+CORE_RANKS[newRank-1].name+"! Perk: "+CORE_RANKS[newRank-1].perk,"#0645ad");
+                logDrop("CORE REFORMED! Granted "+pending+" Core Essence.", "#0000b3");
             }
         }
 
@@ -2035,7 +2049,7 @@
         /* --- SAVE / LOAD / EXPORT SYSTEMS --- */
         function saveGame() {
             const saveData = {
-                coreExpansionRank: game.coreExpansionRank || 0,
+                totalCoreEssenceEarned: game.totalCoreEssenceEarned || 0,
                 cash: game.cash,
                 totalCashEarned: game.totalCashEarned,
                 depthMeters: game.depthMeters,
