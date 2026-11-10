@@ -239,25 +239,26 @@
             gap: 10px;
             align-items: start;
         }
-        #miners-grid .infobox { margin: 0 !important; min-width: 0; }
+        #miners-grid { grid-auto-rows: 150px; align-items: stretch; }
+        #miners-grid .infobox { margin: 0 !important; min-width: 0; height: 100%; min-height: 0; box-sizing: border-box; overflow: hidden; }
         @media (max-width: 520px) { #miners-grid { grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); } }
-        #automation-editor{border:1px solid #72777d;background:#20252b;color:#e8edf2;font-family:Arial,sans-serif}
+        #automation-editor{border:1px solid #a2a9b1;background:#fff;color:#202122;font-family:Arial,sans-serif}
         #automation-toolbar{background:#f8f9fa;color:#222;border-bottom:1px solid #a2a9b1;padding:8px;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
-        #automation-graph-viewport{height:590px;overflow:auto;position:relative;background-color:#222831;background-image:linear-gradient(rgba(255,255,255,.055) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.055) 1px,transparent 1px);background-size:24px 24px;touch-action:pan-x pan-y}
+        #automation-graph-viewport{height:590px;overflow:auto;position:relative;background-color:#f8f9fa;background-image:linear-gradient(rgba(0,0,0,.055) 1px,transparent 1px),linear-gradient(90deg,rgba(0,0,0,.055) 1px,transparent 1px);background-size:24px 24px;touch-action:pan-x pan-y}
         #automation-graph{position:relative;width:1200px;height:760px}
         #automation-wires{position:absolute;inset:0;width:100%;height:100%;pointer-events:auto;overflow:visible}
         .auto-wire{cursor:pointer;pointer-events:stroke}.auto-wire:hover{stroke:#f0c674;stroke-width:5}
         .auto-wire{fill:none;stroke:#62c88a;stroke-width:3}
-        .auto-node{position:absolute;width:190px;background:#303943;border:1px solid #82909d;border-radius:5px;color:#f4f6f8;box-shadow:0 3px 9px #0008;z-index:2;user-select:none}
+        .auto-node{position:absolute;width:205px;background:#fff;border:1px solid #72777d;border-radius:2px;color:#202122;box-shadow:0 1px 3px #0002;z-index:2;user-select:none}
         .auto-node.selected{outline:2px solid #f0c674}
-        .auto-node-head{padding:7px 9px;background:#414d59;border-bottom:1px solid #758391;cursor:grab;font-weight:bold;font-size:13px}
+        .auto-node-head{padding:7px 9px;background:#eaecf0;border-bottom:1px solid #a2a9b1;cursor:grab;font-weight:bold;font-size:13px;color:#202122}
         .auto-node-body{padding:8px;font-size:12px}.auto-node-body label{display:block;margin:5px 0}
-        .auto-pin-row{display:flex;justify-content:space-between;gap:10px;align-items:center;margin:5px 0;min-height:20px;font-size:11px;color:#d5dde5}
+        .auto-pin-row{display:flex;justify-content:space-between;gap:10px;align-items:center;margin:5px 0;min-height:20px;font-size:11px;color:#202122}
         .auto-pin{width:13px;height:13px;padding:0;border-radius:50%;border:2px solid #d7e1eb;background:#27313b;cursor:pointer;margin:0 3px;flex:0 0 13px}
         .auto-pin.output{background:#62c88a;border-color:#c7f4d8}.auto-pin.pending{background:#f0c674}
-        .auto-node small{color:#c1ccd6}.auto-node input[type=number],.auto-node select{max-width:90px}
+        .auto-node small{color:#54595d}.auto-node input[type=number],.auto-node select{max-width:90px}
         #automation-inspector{background:#f8f9fa;color:#222;border-top:1px solid #a2a9b1;padding:8px;font-family:Arial,sans-serif}
-        #automation-graph-status{font-family:monospace;font-size:12px;padding:7px;color:#d5dde5}
+        #automation-graph-status{font-family:monospace;font-size:12px;padding:7px;color:#202122;background:#f8f9fa;border-top:1px solid #a2a9b1}
         @media(max-width:600px){#automation-graph-viewport{height:520px}}
     </style>
 </head>
@@ -287,6 +288,7 @@
         <span data-tab="tab-rig" class="tab-btn active">Mining Rig</span> |
         <span data-tab="tab-inventory" class="tab-btn">Inventory & Market</span> |
         <span data-tab="tab-upgrades" class="tab-btn">Upgrades</span> |
+        <span data-tab="tab-automation" class="tab-btn">Automation</span> |
         <span data-tab="tab-depth" class="tab-btn">Depth Strata</span> |
         <span data-tab="tab-prestige" class="tab-btn">Ascension</span> |
         <span data-tab="tab-stats" class="tab-btn">Statistics & Codex</span>
@@ -412,15 +414,19 @@
                 <!-- JS populated upgrades list -->
             </div>
 
+
+        </div>
+
+        <div id="tab-automation" class="tab-content hidden">
             <div id="automation-control-panel" class="infobox">
-                <h3>Visual Automation Workshop</h3>
-                <p>Build an automation program by connecting machine nodes. Click a green output pin, then a white input pin. Drag node headers to arrange your system. Your graph is saved with your game.</p>
-                <div id="automation-editor">
+                <h2>Automation Workshop</h2>
+                <p>Build a production line by connecting machine nodes. Click a green output pin, then a white input pin. Drag node headers to arrange the diagram; select a node to read its purpose and settings. Your graph is saved with your game.</p>
+                <div class="infobox"><strong>Quick guide</strong><ol><li>Add a node from the palette.</li><li>Click its green output, then the next node’s white input.</li><li>Connect a route to Sell Ore to enable automatic sales.</li><li>Click a wire to remove it; select nodes to edit settings.</li></ol><strong>Port key:</strong> green = output; white = input; amber = pending connection.</div><div id="automation-editor">
                     <div id="automation-toolbar"><strong>Node palette:</strong>
                         <select id="automation-add-type">
                             <option value="sorter">Ore Sorter</option><option value="filter">Ore Filter</option><option value="splitter">Distribution Splitter</option>
                             <option value="buffer">Batch Buffer</option><option value="storage">Storage Vault</option><option value="market">Market Router</option>
-                            <option value="sell">Sell Ore</option><option value="contract">Contract Terminal</option>
+                            <option value="sell">Sell Ore</option><option value="contract">Contract Terminal</option><option value="crusher">Ore Crusher</option><option value="smelter">Alloy Smelter</option><option value="refinery">Deep Refinery</option><option value="resonator">Crystal Resonator</option>
                         </select>
                         <button id="automation-add-node">Add Node</button><button id="automation-clear-link">Cancel Connection</button><button id="automation-reset-graph">Reset Example Graph</button>
                     </div>
@@ -958,7 +964,8 @@
             const autoPath = game.autoSellEnabled && automationHasPath("miners","sell") && game.automation?.policy !== "stockpile";
             const contractPath = (game.upgrades["a_contract_auto"] || 0) > 0 && automationHasPath("miners","contract") && game.automation?.policy === "balanced";
             const activeAutomationNodes=ensureAutomationGraph().nodes.filter(n=>n.type!=="miners"&&automationHasPath("miners",n.id)&&((n.type==="sell"&&automationHasPath(n.id,"sell"))||n.type!=="sell")).length;
-            const demandByType = { miners: game.minersCount * 6, automation: autoPath ? 2 + activeAutomationNodes : 0, contracts: contractPath ? 2 : 0 };
+            const processPower=ensureAutomationGraph().nodes.filter(n=>["crusher","smelter","refinery","resonator"].includes(n.type)&&automationHasPath("miners",n.id)).reduce((sum,n)=>sum+({crusher:2,smelter:3,refinery:5,resonator:4}[n.type]||0),0);
+            const demandByType = { miners: game.minersCount * 6, automation: autoPath ? 2 + activeAutomationNodes + processPower : 0, contracts: contractPath ? 2 : 0 };
             const efficiency = 1 + Math.min(0.25, (game.upgrades["p_stabilizer"] || 0) * 0.0125);
             let available = generated;
             const ratios = { miners:0, automation:0, contracts:0 };
@@ -1077,8 +1084,9 @@
                 const share=splitter?Math.max(0,Math.min(100,Number(splitter.share??50)))/100:1;
                 const filter=nodes.find(n=>n.type==="filter"&&automationHasPath("sorter",n.id)&&ensureAutomationGraph().links.some(l=>l.from===n.id&&l.out===0&&automationHasPath(l.to,"sell")));
                 const filterRule=filter?{tier:Number(filter.tier||1),match:true}:null;
+                const processRules=nodes.filter(n=>["crusher","smelter","refinery","resonator"].includes(n.type)&&automationHasPath("sorter",n.id)&&automationHasPath(n.id,"sell")).map(n=>({tierStart:Math.min(Number(n.tierStart||1),Number(n.tierEnd||10)),tierEnd:Math.max(Number(n.tierStart||1),Number(n.tierEnd||10)),efficiency:Number(n.efficiency)||0}));
                 let count=0;ORE_TIERS.forEach(t=>t.ores.forEach(o=>{if(!filterRule||t.tier===filterRule.tier)count+=Math.floor(Math.max(0,(game.inventory[o.id]||0)-reserve)*share);}));
-                if(count>=batch)sellAllInventory(true,true,share,filterRule);
+                if(count>=batch)sellAllInventory(true,true,share,filterRule,processRules);
             }
         }
 
@@ -1091,7 +1099,11 @@
             storage:{name:"Storage Vault",inputs:["Ore input"],outputs:["Stored ore"],desc:"Keeps a reserve from liquidation."},
             market:{name:"Market Router",inputs:["Ore input"],outputs:["Sale route"],desc:"Routes material to the market."},
             sell:{name:"Sell Ore",inputs:["Ore input"],outputs:[],desc:"Liquidates material reaching this node."},
-            contract:{name:"Contract Terminal",inputs:["Ore input"],outputs:["Remainder"],desc:"Feeds eligible ore into buyer contracts."}
+            contract:{name:"Contract Terminal",inputs:["Ore input"],outputs:["Remainder"],desc:"Feeds eligible ore into buyer contracts."},
+            crusher:{name:"Ore Crusher",inputs:["Ore input"],outputs:["Crushed ore"],desc:"Processes middle-depth ores for extra sale value."},
+            smelter:{name:"Alloy Smelter",inputs:["Ore input"],outputs:["Refined alloy"],desc:"Smelts mid-to-deep ores for a larger value bonus."},
+            refinery:{name:"Deep Refinery",inputs:["Ore input"],outputs:["Refined material"],desc:"Refines high-tier ores; consumes more grid power."},
+            resonator:{name:"Crystal Resonator",inputs:["Ore input"],outputs:["Resonated crystal"],desc:"Resonates rare late-game crystals for a strong sale bonus."}
         };
         function defaultAutomationGraph(){return {nodes:[
             {id:"miners",type:"miners",x:35,y:100},{id:"sorter",type:"sorter",x:285,y:100},{id:"market",type:"market",x:555,y:70},
@@ -1302,7 +1314,7 @@
             renderInventoryGrid();
         }
 
-        function sellAllInventory(silent = false, automated = false, marketShare = 1, filterRule = null) {
+        function sellAllInventory(silent = false, automated = false, marketShare = 1, filterRule = null, processRules = []) {
             let totalEarned = 0;
             let itemsSold = 0;
 
@@ -1319,7 +1331,9 @@
                     if (toSell > 0) {
                         const sorterMult = automated ? UPGRADE_DEFINITIONS.find(u => u.id === "a_smart_sorter").effect(game.upgrades["a_smart_sorter"] || 0) : 1;
                         const autoBonus = automated ? UPGRADE_DEFINITIONS.find(u => u.id === "a_auto_bonus").effect(game.upgrades["a_auto_bonus"] || 0) : 1;
-                        const worth = ore.value * toSell * purityMult * game.marketMultiplier * (game.marketEventMultiplier || 1) * (1 + game.biddingNegotiationBonus) * game.prestigeMultipliers.cashMult * autoBonus * sorterMult;
+                        const oreTier=ORE_TIERS.find(t=>t.ores.some(o=>o.id===ore.id))?.tier||1;
+                        const processMult=automated?processRules.filter(r=>oreTier>=r.tierStart&&oreTier<=r.tierEnd).reduce((m,r)=>m*(1+Math.max(0,Math.min(500,Number(r.efficiency)||0))/100),1):1;
+                        const worth = ore.value * toSell * processMult * purityMult * game.marketMultiplier * (game.marketEventMultiplier || 1) * (1 + game.biddingNegotiationBonus) * game.prestigeMultipliers.cashMult * autoBonus * sorterMult;
                         totalEarned += worth;
                         itemsSold += toSell;
                         game.inventory[ore.id] -= toSell;
@@ -1484,6 +1498,7 @@
                         const activeCategory = document.querySelector(".upg-cat-btn.active")?.getAttribute("data-upgrade-cat") || "mining";
                         renderUpgradesGrid(activeCategory);
                     }
+                    if (targetTab === "tab-automation") renderAutomationGraph();
                     if (targetTab === "tab-depth") renderDepthTab();
                     if (targetTab === "tab-prestige") renderPrestigeTab();
                     if (targetTab === "tab-stats") renderCodex();
