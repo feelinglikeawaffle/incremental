@@ -1018,7 +1018,8 @@
             const contractAuto = game.upgrades["a_contract_auto"] || 0;
             const contractWireConnected = game.automation?.wires?.minerSorter !== false &&
                 game.automation?.wires?.sorterContract !== false;
-            if (contractAuto > 0 && contractWireConnected && game.activeContract) {
+            const contractPriorityEnabled = (game.automation?.policy || "balanced") === "balanced";
+            if (contractAuto > 0 && contractWireConnected && contractPriorityEnabled && game.activeContract) {
                 if (game.inventory[game.activeContract.oreId] >= game.activeContract.requiredAmount) {
                     fulfillContract();
                 }
@@ -1035,8 +1036,9 @@
             const quickSellInterval = UPGRADE_DEFINITIONS.find(u => u.id === "a_quick_sell").effect(game.upgrades["a_quick_sell"] || 0);
             if (autoSellAccumulator >= quickSellInterval) {
                 autoSellAccumulator = 0;
-                const reserve = Math.max(0, Number(game.automation?.reserve) || 0);
-                const batch = Math.max(1, Number(game.automation?.minBatch) || 1);
+                const reserve = wires.sorterVault ? Math.max(0, Number(game.automation?.reserve) || 0) : 0;
+                const bufferReduction = UPGRADE_DEFINITIONS.find(u => u.id === "a_buffer").effect(game.upgrades["a_buffer"] || 0);
+                const batch = Math.max(1, (Number(game.automation?.minBatch) || 1) - bufferReduction);
                 let sellable = 0;
                 ORE_TIERS.forEach(t => t.ores.forEach(o => {
                     sellable += Math.max(0, (game.inventory[o.id] || 0) - reserve);
@@ -1094,6 +1096,8 @@
             if (!w.minerSorter) missing.push("Miner Bus → Ore Sorter");
             if (!w.sorterMarket) missing.push("Ore Sorter → Market Router");
             if (!w.marketLiquidator) missing.push("Market Router → Liquidation Relay");
+            if (!w.sorterContract) missing.push("Ore Sorter → Contract Terminal");
+            if (!w.sorterVault) missing.push("Ore Sorter → Storage Vault");
             status.textContent = missing.length ? "Line interrupted: " + missing.join(", ") : "All connections active.";
         }
 
@@ -1257,7 +1261,7 @@
             ORE_TIERS.forEach(tier => {
                 tier.ores.forEach(ore => {
                     const owned = game.inventory[ore.id] || 0;
-                    const reserve = automated ? Math.max(0, Number(game.automation?.reserve) || 0) : 0;
+                    const reserve = automated && game.automation?.wires?.sorterVault !== false ? Math.max(0, Number(game.automation?.reserve) || 0) : 0;
                     const toSell = automated ? Math.max(0, owned - reserve) : owned;
                     if (toSell > 0) {
                         const sorterMult = automated ? UPGRADE_DEFINITIONS.find(u => u.id === "a_smart_sorter").effect(game.upgrades["a_smart_sorter"] || 0) : 1;
