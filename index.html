@@ -259,6 +259,17 @@
         .auto-node small{color:#54595d}.auto-node input[type=number],.auto-node select{max-width:90px}
         #automation-inspector{background:#f8f9fa;color:#222;border-top:1px solid #a2a9b1;padding:8px;font-family:Arial,sans-serif}
         #automation-graph-status{font-family:monospace;font-size:12px;padding:7px;color:#202122;background:#f8f9fa;border-top:1px solid #a2a9b1}
+        #automation-flow-viewport{height:300px;overflow:auto;border:1px solid #a2a9b1;background-color:#fbfcfd;background-image:linear-gradient(rgba(0,0,0,.045) 1px,transparent 1px),linear-gradient(90deg,rgba(0,0,0,.045) 1px,transparent 1px);background-size:24px 24px}
+        #automation-flow-svg{display:block;width:100%;min-width:720px;height:100%}
+        .flow-wire{fill:none;stroke:#a2a9b1;stroke-width:4;stroke-dasharray:7 6}
+        .flow-wire.active{stroke:#29945a;stroke-width:5;stroke-dasharray:10 7;animation:flow-dash 1.2s linear infinite}
+        .flow-node{fill:#f1f3f5;stroke:#72777d;stroke-width:2}
+        .flow-node.active{fill:#e5f5e9;stroke:#25834d;stroke-width:3}
+        .flow-node text{font: bold 17px Arial,sans-serif;fill:#202122}
+        .flow-node .flow-sub{font:13px Arial,sans-serif;fill:#54595d;font-weight:normal}
+        .flow-particle{fill:#f0a52b;stroke:#805000;stroke-width:1}
+        #automation-flow-status{font:12px monospace;padding:7px;background:#f8f9fa;border-top:1px solid #a2a9b1}
+        @keyframes flow-dash{to{stroke-dashoffset:-34}}
         @media(max-width:600px){#automation-graph-viewport{height:520px}}
     </style>
 </head>
@@ -431,6 +442,12 @@
                         <button id="automation-add-node">Add Node</button><button id="automation-clear-link">Cancel Connection</button><button id="automation-reset-graph">Reset Example Graph</button>
                     </div>
                     <div id="automation-graph-viewport"><div id="automation-graph"><svg id="automation-wires" viewBox="0 0 1200 760" aria-hidden="true"></svg></div></div>
+                    <div id="automation-flow-panel" class="infobox">
+                        <h3>Live Resource Flow</h3>
+                        <p>Animated ore markers travel along connected routes. Green machines are receiving resources; grey machines are idle or disconnected. This view follows your workshop wiring and current power state.</p>
+                        <div id="automation-flow-viewport"><svg id="automation-flow-svg" viewBox="0 0 1200 760" role="img" aria-label="Live resource flow diagram"></svg></div>
+                        <div id="automation-flow-status" aria-live="polite">Waiting for automation status…</div>
+                    </div>
                     <div id="automation-inspector"><strong>Node details:</strong> <span id="automation-inspector-content">Select a node to inspect its settings.</span></div>
                     <div id="automation-graph-status">Connect Miner Output → Ore Sorter → Market Router → Sell Ore.</div>
                 </div>
@@ -990,6 +1007,7 @@
                 updateMiners(dt * (power.ratios.miners || 0));
                 if (game.autoSellEnabled && power.ratios.automation > 0) autoSellTick(dt * power.ratios.automation);
                 updateUIHUD();
+                renderAutomationFlow();
 
                 requestAnimationFrame(loop);
             }
@@ -1174,6 +1192,35 @@
             renderAutomationGraph();
         }
         function automationSaveGraph(){saveGame();renderAutomationGraph();}
+        let lastAutomationVisualUpdate=0;
+        function renderAutomationFlow(force=false){
+            const now=Date.now();if(!force&&now-lastAutomationVisualUpdate<700)return;lastAutomationVisualUpdate=now;
+            const svg=document.getElementById("automation-flow-svg");if(!svg||document.getElementById("tab-automation")?.classList.contains("hidden"))return;
+            const g=ensureAutomationGraph(),powered=(game.powerRatios?.automation??0)>0,minersPowered=(game.powerRatios?.miners??1)>0;
+            const reachable=new Set(["miners"]),queue=["miners"];
+            while(queue.length){const id=queue.shift();g.links.filter(l=>l.from===id).forEach(l=>{if(!reachable.has(l.to)){reachable.add(l.to);queue.push(l.to);}});}
+            const nodeActive=n=>reachable.has(n.id)&&minersPowered&&powered&&(n.type!=="sell"||game.autoSellEnabled)&&(n.type!=="contract"||((game.upgrades["a_contract_auto"]||0)>0&&game.automation?.policy==="balanced"));
+            const positions=n=>({x:n.x||0,y:n.y||0});
+            let markup="";
+            g.links.forEach((l,index)=>{
+                const a=automationNode(l.from),b=automationNode(l.to);if(!a||!b)return;
+                const pa=positions(a),pb=positions(b),x1=pa.x+205,y1=pa.y+75+(l.out||0)*22,x2=pb.x,y2=pb.y+75+(l.input||0)*22;
+                const d="M "+x1+" "+y1+" C "+(x1+65)+" "+y1+", "+(x2-65)+" "+y2+", "+x2+" "+y2;
+                const active=reachable.has(l.from)&&reachable.has(l.to)&&nodeActive(a)&&nodeActive(b);
+                markup+='<path id="flow-route-'+index+'" class="flow-wire '+(active?'active':'')+'" d="'+d+'"/>';
+                if(active)markup+='<circle class="flow-particle" r="7"><animateMotion dur="'+(1.8+(index%3)*.45)+'s" repeatCount="indefinite" begin="'+(-index*.37)+'s"><mpath href="#flow-route-'+index+'"/></animateMotion></circle>';
+            });
+            g.nodes.forEach(n=>{
+                const p=positions(n),active=nodeActive(n),name=(AUTOMATION_NODE_TYPES[n.type]?.name||n.type).replace(/&/g,"&amp;").replace(/</g,"&lt;");
+                const count=n.type==="miners"?game.minersCount+" rigs":active?"Receiving":"Idle / offline";
+                markup+='<g class="flow-node '+(active?'active':'')+'" transform="translate('+p.x+' '+p.y+')"><rect width="205" height="92" rx="5"/><text x="12" y="31">'+name+'</text><text class="flow-sub" x="12" y="57">'+count+'</text><text class="flow-sub" x="12" y="77">'+(active?'● LIVE':'○ STANDBY')+'</text></g>';
+            });
+            svg.innerHTML=markup;
+            const activeCount=g.nodes.filter(nodeActive).length,oreCount=Object.values(game.inventory||{}).reduce((a,b)=>a+(Number(b)||0),0);
+            const status=document.getElementById("automation-flow-status");
+            if(status)status.textContent=activeCount+" / "+g.nodes.length+" machines active · "+formatNumber(oreCount)+" ore currently in inventory · "+(powered?"Automation power available":"Automation has no power")+(game.autoSellEnabled?" · Auto-sell enabled":" · Auto-sell disabled");
+        }
+
         function renderAutomationGraph(){
             const root=document.getElementById("automation-graph");if(!root)return;const g=ensureAutomationGraph(),svg=document.getElementById("automation-wires");
             root.querySelectorAll(".auto-node").forEach(n=>n.remove());svg.innerHTML="";
@@ -1211,6 +1258,7 @@
                 root.appendChild(el);
             });
             renderAutomationInspector(automationNode(automationSelectedNode));
+            renderAutomationFlow(true);
             const status=document.getElementById("automation-graph-status");if(status)status.textContent=automationPendingOutput?"Choose an input pin to complete the wire.":automationHasPath("miners","sell")?"Active path: Miner Output → Sell Ore.":"No complete Miner Output → Sell Ore path; connect nodes to enable auto-selling.";
         }
         function renderAutomationWiresOnly(){const svg=document.getElementById("automation-wires"),g=ensureAutomationGraph();svg.innerHTML="";g.links.forEach((l,index)=>{const a=automationNode(l.from),b=automationNode(l.to);if(!a||!b)return;const p=document.createElementNS("http://www.w3.org/2000/svg","path"),ax=a.x+190,ay=a.y+70+(l.out||0)*22,bx=b.x,by=b.y+70+(l.input||0)*22;p.setAttribute("d","M "+ax+" "+ay+" C "+(ax+65)+" "+ay+", "+(bx-65)+" "+by+", "+bx+" "+by);p.setAttribute("class","auto-wire");p.addEventListener("click",()=>{g.links.splice(index,1);automationSaveGraph();});svg.appendChild(p);});}
@@ -1616,6 +1664,7 @@
                     return;
                 }
                 game.autoSellEnabled = e.target.checked;
+                renderAutomationFlow(true);
             });
 
             // UPGRADES CATEGORY TABS
