@@ -1468,7 +1468,7 @@
                 return;
             }
 
-            if (confirm(`Ascend facility now? Reset cash and standard upgrades to gain ${pending} AP?`)) {
+            if (confirm(`Reform the facility now? Reset cash and standard upgrades to gain ${pending} Rank I Core Essence?`)) {
                 ensureCoreRanks(); game.coreRanks[1] += pending; game.prestigeTokens = game.coreRanks[1];
                 game.totalPrestigeResets++;
 
@@ -1531,6 +1531,31 @@
             // Calculate pending ascension tokens
             const pendingTokens = calculatePendingPrestigeTokens();
             document.getElementById("prestige-pending-tokens").textContent = formatNumber(pendingTokens)+" Rank I";
+            updateLiveActionButtons();
+        }
+
+
+        function updateLiveActionButtons() {
+            document.querySelectorAll("[data-live-cost]").forEach(button => {
+                const cost=Number(button.dataset.liveCost)||0;
+                const balance=button.dataset.liveCurrency==="core" ? game.prestigeTokens : game.cash;
+                button.disabled=button.dataset.liveMax==="true" || balance<cost;
+            });
+            document.querySelectorAll("[data-miner-buy]").forEach(button => {
+                const cost=Math.floor(100*Math.pow(2.8,game.minersCount));
+                button.textContent="Activate Miner Slot ("+formatMoney(cost)+")";
+                button.disabled=game.cash<cost || game.minersCount>=game.minerMaxSlots;
+                button.onclick=()=>purchaseMiner(cost);
+            });
+            const next=ORE_TIERS[game.unlockedTier];
+            const drill=document.getElementById("btn-drill-deeper");
+            if (drill) {
+                drill.disabled=!next || game.cash<next.costToUnlock;
+                if(next){drill.dataset.liveCost=next.costToUnlock;drill.dataset.liveCurrency="cash";}
+                else drill.removeAttribute("data-live-cost");
+            }
+            const reform=document.getElementById("btn-do-prestige");
+            if(reform) reform.disabled=calculatePendingPrestigeTokens()<=0;
         }
 
         function setupUI() {
@@ -1748,7 +1773,7 @@
                 card.innerHTML = `
                     <h3>${upg.name} (Level ${currentLvl} / ${upg.maxLvl})</h3>
                     <p>${upg.desc}</p>
-                    <button onclick="buyUpgrade('${upg.id}')" ${isMax || game.cash < cost ? 'disabled' : ''}>
+                    <button data-live-cost="${cost}" data-live-currency="cash" data-live-max="${isMax}" onclick="buyUpgrade('${upg.id}')" ${isMax || game.cash < cost ? 'disabled' : ''}>
                         ${isMax ? 'MAX LEVEL' : `Purchase Upgrade (${formatMoney(cost)})`}
                     </button>
                 `;
@@ -1832,8 +1857,8 @@
                 card.innerHTML = `
                     <h3>${perk.name} (Level ${currentLvl} / ${perk.maxLvl})</h3>
                     <p>${perk.desc}</p>
-                    <button onclick="buyPrestigePerk('${perk.id}')" ${isMax || game.prestigeTokens < cost ? 'disabled' : ''}>
-                        ${isMax ? 'MAX PERK' : `Purchase Perk (${cost} AP)`}
+                    <button data-live-cost="${cost}" data-live-currency="core" data-live-max="${isMax}" onclick="buyPrestigePerk('${perk.id}')" ${isMax || game.prestigeTokens < cost ? 'disabled' : ''}>
+                        ${isMax ? 'MAX PERK' : `Purchase Perk (${cost} Core Essence)`}
                     </button>
                 `;
                 grid.appendChild(card);
