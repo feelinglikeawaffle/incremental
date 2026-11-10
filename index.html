@@ -1071,6 +1071,7 @@
                     if (currentPhase === 'scanning') statusText.textContent = "⏳ Phase 1/3: Scanning & Locating Rock Target...";
                     if (currentPhase === 'mining') statusText.textContent = "⛏️ Phase 2/3: Mining Core Vein...";
                     if (currentPhase === 'polishing') statusText.textContent = "💎 Phase 3/3: Polishing & Extracting Ore...";
+                    if (currentPhase === "paused") statusText.textContent = "⏸ Power unavailable — miner paused";
                 }
                 if (rockText) {
                     rockText.textContent = miner.currentRock.name;
@@ -1429,8 +1430,9 @@
 
             const cost = Math.floor(perk.baseCost * Math.pow(perk.costMult, currentLvl));
             if (game.prestigeTokens >= cost) {
+                ensureCoreRanks();
                 game.prestigeTokens -= cost;
-                ensureCoreRanks(); game.coreRanks[1] = game.prestigeTokens;
+                game.coreRanks[1] = game.prestigeTokens;
                 game.prestigePerks[perk.id] = currentLvl + 1;
                 recalculateStats();
                 renderPrestigeTab();
@@ -1467,7 +1469,6 @@
             }
 
             if (confirm(`Ascend facility now? Reset cash and standard upgrades to gain ${pending} AP?`)) {
-                game.prestigeTokens += pending;
                 ensureCoreRanks(); game.coreRanks[1] += pending; game.prestigeTokens = game.coreRanks[1];
                 game.totalPrestigeResets++;
 
@@ -1665,7 +1666,7 @@
                         <div>
                             <strong>Locked Miner Slot #${i + 1}</strong>
                             <br>
-                            <button onclick="purchaseMiner(${minerBuyCost})">Activate Miner Slot (${formatMoney(minerBuyCost)})</button>
+                            <button data-miner-buy="true" onclick="purchaseMiner(${minerBuyCost})">Activate Miner Slot (${formatMoney(minerBuyCost)})</button>
                         </div>
                     `;
                 }
