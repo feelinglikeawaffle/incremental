@@ -771,6 +771,22 @@
         ORE_TIERS.forEach((tier, index) => tier.ores.push(...(EXTRA_ORES_BY_TIER[index] || [])));
         ORE_TIERS[2].ores.push({id:"uranium",name:"Uranium Ore",value:95000,weight:1,icon:"fa-radiation",color:"#65a30d"});
 
+// Economy rebalance: keep rarity spreads, but compress tier-to-tier value jumps.
+// Values below are target values for each tier's commonest ore; other ores retain
+// their relative rarity premium with a softer curve.
+const TIER_VALUE_BASES = [1,80,600,4500,30000,200000,1300000,8000000,50000000,300000000,2000000000,12000000000,75000000000,450000000000,3000000000000,20000000000000,130000000000000,800000000000000];
+const TIER_UNLOCK_COSTS = [0,500,6500,90000,1200000,18000000,300000000,5000000000,90000000000,1800000000000,40000000000000,800000000000000,1.6e16,3.2e17,6.4e18,1.3e20,2.6e21,5.2e22];
+ORE_TIERS.forEach((tier,index)=>{
+    const target=TIER_VALUE_BASES[index];
+    const originalBase=tier.ores[0]?.value||1;
+    tier.ores.forEach(ore=>{
+        const rarityRatio=Math.max(1,ore.value/originalBase);
+        ore.value=Math.max(1,Math.round(target*Math.pow(rarityRatio,0.75)));
+    });
+    tier.costToUnlock=TIER_UNLOCK_COSTS[index]??tier.costToUnlock;
+});
+
+
         /* --- GAME STATE OBJECT --- */
         const game = {
             cash: 0,
@@ -871,6 +887,9 @@
             { id: "p_stabilizer", cat: "power", name: "Grid Stabilizer Array", desc: "Improves power distribution efficiency under heavy load.", baseCost: 1400, costMult: 2.0, maxLvl: 20, effect: (lvl) => Math.min(0.25, lvl * 0.0125) },
             { id: "p_overdrive", cat: "power", name: "Reactor Overdrive", desc: "Increases generator output by 10% per level.", baseCost: 5000, costMult: 2.25, maxLvl: 25, effect: (lvl) => 1 + lvl * 0.10 }
         ];
+
+        // Standard upgrades now require deliberate investment instead of being swept up by one lucky ore.
+        UPGRADE_DEFINITIONS.forEach(upgrade => { upgrade.baseCost = Math.round(upgrade.baseCost * 8); });
 
         /* --- PRESTIGE PERKS DEFINITIONS --- */
         const PRESTIGE_PERKS = [
@@ -1073,6 +1092,7 @@
         }
 
         const POWER_PLANT_TYPES={solar:{name:"Solar Array",watts:14,cost:250,rank:0,mode:"passive",desc:"Daylight-dependent passive output."},solarFarm:{name:"Solar Farm",watts:75,cost:18000,rank:8,mode:"passive",desc:"Large passive solar array."},coal:{name:"Coal Generator",watts:42,cost:2200,rank:3,mode:"fuel",fuel:"coal",rate:.35,desc:"Consumes coal from inventory."},nuclear:{name:"Nuclear Plant",watts:180,cost:180000,rank:6,mode:"fuel",fuel:"uranium",rate:.08,desc:"Consumes uranium from inventory."},geothermal:{name:"Geothermal Station",watts:95,cost:95000,rank:10,mode:"passive",desc:"Stable passive output."},fusion:{name:"Fusion Reactor",watts:650,cost:2500000,rank:10,mode:"passive",desc:"Very high passive output."},tidal:{name:"Tidal Turbine",watts:110,cost:42000,rank:2,mode:"passive",desc:"Tide-dependent passive output."},antimatter:{name:"Antimatter Converter",watts:900,cost:9e9,rank:5,mode:"fuel",fuel:"antimatter",rate:.015,desc:"Consumes Antimatter Capsules."},dyson:{name:"Dyson Collector",watts:4200,cost:8e12,rank:7,mode:"passive",desc:"Collects stellar output."},vacuum:{name:"Vacuum Energy Tap",watts:18000,cost:6e17,rank:8,mode:"passive",desc:"Extracts quantum vacuum energy."},stellar:{name:"Stellar Engine",watts:95000,cost:5e22,rank:9,mode:"passive",desc:"Uses stellar mass to sustain output."},singularity:{name:"Singularity Plant",watts:600000,cost:2e28,rank:9,mode:"fuel",fuel:"dark_matter",rate:.006,desc:"Consumes Dark Matter."},zeroPoint:{name:"Zero-Point Array",watts:4e7,cost:1e35,rank:10,mode:"passive",desc:"Massive zero-point generator."},realityTap:{name:"Reality Tap",watts:2e9,cost:1e43,rank:10,mode:"fuel",fuel:"origin_core",rate:.0001,desc:"Consumes Origin Cores."},stellarForge:{name:"Stellar Forge",watts:2e11,cost:1e49,rank:11,mode:"passive",desc:"Converts stellar pressure into immense grid output."},multiverseReactor:{name:"Multiverse Reactor",watts:8e14,cost:1e61,rank:15,mode:"passive",desc:"Harvests energy across adjacent realities."},omniversalCore:{name:"Omniversal Core",watts:5e18,cost:1e77,rank:20,mode:"passive",desc:"An effectively limitless endgame power source."}};
+        Object.values(POWER_PLANT_TYPES).forEach(plant => { plant.cost = Math.round(plant.cost * 8); });
         function powerPlantFuelAllowed(plant,id){
             const nodes=ensureAutomationGraph().nodes.filter(n=>(n.type==="whitelist"||n.type==="blacklist")&&automationNodeBound(n.id));
             const white=nodes.filter(n=>n.type==="whitelist"),black=nodes.filter(n=>n.type==="blacklist");
@@ -1247,7 +1267,7 @@ function setupPowerPlantControls(){
             blacklist:{name:"Ore Blacklist",inputs:["Ore input"],outputs:["Allowed ore"],desc:"Blocks the selected ore; can also exclude fuel from power plants."}
         };
         function defaultAutomationGraph(){return {nodes:[{id:"miners",type:"miners",x:35,y:100}],links:[]};}
-        const AUTOMATION_NODE_COSTS={sorter:5000,filter:12000,splitter:18000,buffer:15000,storage:25000,market:30000,sell:20000,contract:50000,crusher:80000,smelter:150000,refinery:400000,resonator:750000,whitelist:35000,blacklist:35000};
+        const AUTOMATION_NODE_COSTS={sorter:150000,filter:300000,splitter:450000,buffer:400000,storage:650000,market:800000,sell:550000,contract:1200000,crusher:2000000,smelter:5000000,refinery:12000000,resonator:20000000,whitelist:900000,blacklist:900000};
         function automationUnlocked(){return getCoreRank()>=3;}
         function updateAutomationUnlockUI(){const tab=document.getElementById("automation-nav-tab");if(tab)tab.classList.toggle("hidden",!automationUnlocked());}
         function updateAutomationNodePrice(){const type=document.getElementById("automation-add-type")?.value,cost=AUTOMATION_NODE_COSTS[type]||0,price=document.getElementById("automation-node-price"),button=document.getElementById("automation-add-node");if(price)price.textContent=cost?"Cost: "+formatMoney(cost):"";if(button)button.disabled=!automationUnlocked()||game.cash<cost;}
@@ -1703,7 +1723,7 @@ function setupPowerPlantControls(){
                 button.disabled=button.dataset.liveMax==="true" || balance<cost;
             });
             document.querySelectorAll("[data-miner-buy]").forEach(button => {
-                const cost=Math.floor(100*Math.pow(2.8,game.minersCount));
+                const cost=Math.floor(800*Math.pow(2.8,game.minersCount));
                 button.textContent="Activate Miner Slot ("+formatMoney(cost)+")";
                 button.disabled=game.cash<cost || game.minersCount>=game.minerMaxSlots;
                 button.onclick=()=>purchaseMiner(cost);
@@ -1849,7 +1869,7 @@ function setupPowerPlantControls(){
                         </div>
                     `;
                 } else {
-                    const minerBuyCost = Math.floor(100 * Math.pow(2.8, game.minersCount));
+                    const minerBuyCost = Math.floor(800 * Math.pow(2.8, game.minersCount));
                     card.innerHTML = `
                         <div>
                             <strong>Locked Miner Slot #${i + 1}</strong>
