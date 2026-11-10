@@ -467,7 +467,7 @@
             <div class="infobox" style="background-color: #f0f0ff; border-color: #a0a0d0;">
                 <h3>Core Reformation Protocol</h3>
                 <p>Reform your facility to extract Core Essence (Rank I). The reset clears cash, miners, inventory, and standard upgrades while preserving Core Essence and permanent evolution perks.</p>
-                <p>Core Essence gained on reformation: <strong id="prestige-pending-tokens">0 AP</strong></p>
+                <p>Core Essence gained on reformation: <strong id="prestige-pending-tokens">0 Rank I</strong></p>
                 <button id="btn-do-prestige"><b>[ REFORM CORE ]</b></button>
             </div>
 
@@ -1416,6 +1416,7 @@
                 game.upgrades[upg.id] = currentLvl + 1;
                 recalculateStats();
                 renderUpgradesGrid(upg.cat);
+                if (upg.id === "m_slots") renderMinersGrid();
                 updateUIHUD();
                 logDrop(`Purchased upgrade: ${upg.name} (Level ${game.upgrades[upg.id]})`, "#000000");
             }
@@ -1437,7 +1438,7 @@
                 recalculateStats();
                 renderPrestigeTab();
                 updateUIHUD();
-                logDrop(`Purchased Transcendent Perk: ${perk.name}`, "#0000b3");
+                logDrop(`Purchased Core Evolution Perk: ${perk.name}`, "#0000b3");
             }
         }
 
@@ -1464,7 +1465,7 @@
         function performPrestigeReset() {
             const pending = calculatePendingPrestigeTokens();
             if (pending <= 0) {
-                alert("You need at least $100,000 all-time earnings to gain Ascension Points.");
+                alert("You need at least $100,000 in all-time earnings to gain Core Essence.");
                 return;
             }
 
@@ -1484,7 +1485,7 @@
                 initData();
                 renderMinersGrid();
                 updateUIHUD();
-                logDrop(`FACILITY ASCENDED! Granted ${pending} Ascension Tokens!`, "#0000b3");
+                logDrop(`CORE REFORMED! Granted ${pending} Rank I Core Essence.`, "#0000b3");
             }
         }
 
