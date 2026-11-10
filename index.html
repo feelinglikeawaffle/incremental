@@ -281,7 +281,7 @@
         .flow-node{fill:#f1f3f5;stroke:#72777d;stroke-width:2}
         .flow-node.active{fill:#eef4ff;stroke:#36c;stroke-width:2}
         .flow-node.blocked{fill:#fff0f0;stroke:#b32424;stroke-width:3}
-        .flow-node text{font: bold 16px Arial,sans-serif;fill:#202122}
+        .flow-node text{font: 14px Arial,sans-serif;fill:#202122}
         .flow-node .flow-sub{font:12px Arial,sans-serif;fill:#54595d;font-weight:normal}
         .flow-particle{fill:#36c;stroke:#fff;stroke-width:1}
         #automation-flow-status{font:12px monospace;padding:7px;background:#f8f9fa;border-top:1px solid #a2a9b1}
@@ -456,7 +456,7 @@
         <div id="tab-automation" class="tab-content hidden">
             <div id="automation-control-panel" class="infobox">
                 <h2>Automation Workshop</h2>
-                <p>Build a production line by connecting machine nodes. Click a green output pin, then a white input pin. Drag node headers to arrange the diagram; select a node to read its purpose and settings. Your graph is saved with your game.</p>
+                <p>Build a production line by purchasing machine nodes and connecting them. Click a green output pin, then a white input pin. Drag node headers to arrange the diagram; select a node to read its purpose and settings. Your graph is saved with your game.</p>
                 <div class="infobox"><strong>Quick guide</strong><ol><li>Add a node from the palette.</li><li>Click its green output, then the next node’s white input.</li><li>Connect a route to Sell Ore to enable automatic sales.</li><li>Click a wire to remove it; select nodes to edit settings.</li></ol><strong>Port key:</strong> green = output; white = input; amber = pending connection.</div><div id="automation-editor">
                     <div id="automation-toolbar"><strong>Node palette:</strong>
                         <select id="automation-add-type">
@@ -464,7 +464,7 @@
                             <option value="buffer">Batch Buffer</option><option value="storage">Storage Vault</option><option value="market">Market Router</option>
                             <option value="sell">Sell Ore</option><option value="contract">Contract Terminal</option><option value="crusher">Ore Crusher</option><option value="smelter">Alloy Smelter</option><option value="refinery">Deep Refinery</option><option value="resonator">Crystal Resonator</option><option value="whitelist">Ore Whitelist</option><option value="blacklist">Ore Blacklist</option>
                         </select>
-                        <button id="automation-add-node">Add Node</button><button id="automation-clear-link">Cancel Connection</button><button id="automation-reset-graph">Reset Example Graph</button>
+                        <button id="automation-add-node">Purchase & Add Node</button> <span id="automation-node-price"></span><button id="automation-clear-link">Cancel Connection</button><button id="automation-reset-graph">Reset Example Graph</button>
                     </div>
                     <div class="automation-zoom"><strong>Workshop zoom:</strong><button type="button" id="automation-zoom-out">−</button><output id="automation-zoom-level">100%</output><button type="button" id="automation-zoom-in">+</button><button type="button" id="automation-zoom-reset">Reset</button></div>
                     <div id="automation-graph-viewport"><div id="automation-graph"><svg id="automation-wires" viewBox="0 0 1200 760" aria-hidden="true"></svg></div></div>
@@ -938,7 +938,7 @@
             const rank=getCoreRank(),next=CORE_RANKS[rank],total=game.totalCoreEssenceEarned||0;
             let html='<p><strong>Current rank:</strong> '+(rank?('Rank '+CORE_RANKS[rank-1].title+' — '+CORE_RANKS[rank-1].name):'Unranked')+' · <strong>Lifetime Core Essence:</strong> '+formatNumber(total)+'</p>';
             if(next)html+='<p><strong>Next rank:</strong> '+next.title+' — '+next.name+' ('+formatNumber(Math.max(0,next.essence-total))+' more lifetime Essence required)</p>';
-            CORE_RANKS.forEach((r,i)=>{const earned=i<rank,progress=Math.min(100,total/r.essence*100);html+='<div class="core-rank-record '+(i===rank-1?'current':earned?'unlocked':'locked')+'"><strong>Rank '+r.title+' — '+r.name+'</strong> <span>'+(earned?'✓ Unlocked':'Locked')+'</span><p><strong>'+r.perk+'</strong> — '+r.effect+'</p><small>Unlock: '+(r.unlock||'Permanent rank perk')+'</small><div class="core-rank-progress"><span style="width:'+progress+'%"></span></div><small>'+formatNumber(Math.min(total,r.essence))+' / '+formatNumber(r.essence)+' lifetime Essence</small></div>';});
+            CORE_RANKS.slice(0,rank+5).forEach((r,i)=>{const earned=i<rank,progress=Math.min(100,total/r.essence*100);html+='<div class="core-rank-record '+(i===rank-1?'current':earned?'unlocked':'locked')+'"><strong>Rank '+r.title+' — '+r.name+'</strong> <span>'+(earned?'✓ Unlocked':'Locked')+'</span><p><strong>'+r.perk+'</strong> — '+r.effect+'</p><small>Unlock: '+(r.unlock||'Permanent rank perk')+'</small><div class="core-rank-progress"><span style="width:'+progress+'%"></span></div><small>'+formatNumber(Math.min(total,r.essence))+' / '+formatNumber(r.essence)+' lifetime Essence</small></div>';});
             root.innerHTML=html;
         }
 
@@ -1240,10 +1240,11 @@ function setupPowerPlantControls(){
             whitelist:{name:"Ore Whitelist",inputs:["Ore input"],outputs:["Allowed ore"],desc:"Only passes the selected ore; can also authorize fuel for power plants."},
             blacklist:{name:"Ore Blacklist",inputs:["Ore input"],outputs:["Allowed ore"],desc:"Blocks the selected ore; can also exclude fuel from power plants."}
         };
-        function defaultAutomationGraph(){return {nodes:[
-            {id:"miners",type:"miners",x:35,y:100},{id:"sorter",type:"sorter",x:285,y:100},{id:"market",type:"market",x:555,y:70},
-            {id:"sell",type:"sell",x:850,y:70},{id:"storage",type:"storage",x:555,y:300},{id:"contract",type:"contract",x:850,y:300}
-        ],links:[{from:"miners",to:"sorter",out:0,input:0},{from:"sorter",to:"market",out:0,input:0},{from:"market",to:"sell",out:0,input:0},{from:"sorter",to:"storage",out:0,input:0},{from:"sorter",to:"contract",out:0,input:0}]};}
+        function defaultAutomationGraph(){return {nodes:[{id:"miners",type:"miners",x:35,y:100}],links:[]};}
+        const AUTOMATION_NODE_COSTS={sorter:5000,filter:12000,splitter:18000,buffer:15000,storage:25000,market:30000,sell:20000,contract:50000,crusher:80000,smelter:150000,refinery:400000,resonator:750000,whitelist:35000,blacklist:35000};
+        function automationUnlocked(){return getCoreRank()>=3;}
+        function updateAutomationUnlockUI(){const tab=document.getElementById("automation-nav-tab");if(tab)tab.classList.toggle("hidden",!automationUnlocked());}
+        function updateAutomationNodePrice(){const type=document.getElementById("automation-add-type")?.value,cost=AUTOMATION_NODE_COSTS[type]||0,price=document.getElementById("automation-node-price"),button=document.getElementById("automation-add-node");if(price)price.textContent=cost?"Cost: "+formatMoney(cost):"";if(button)button.disabled=!automationUnlocked()||game.cash<cost;}
         function ensureAutomationGraph(){if(!game.automation)game.automation={};if(!game.automation.graph||!Array.isArray(game.automation.graph.nodes))game.automation.graph=defaultAutomationGraph();return game.automation.graph;}
         function automationHasPath(from,to){const g=ensureAutomationGraph(),seen=new Set([from]),q=[from];while(q.length){const id=q.shift();if(id===to)return true;g.links.filter(l=>l.from===id).forEach(l=>{if(!seen.has(l.to)){seen.add(l.to);q.push(l.to);}});}return false;}
         function automationNode(id){return ensureAutomationGraph().nodes.find(n=>n.id===id);}
@@ -1274,8 +1275,10 @@ function setupPowerPlantControls(){
         let automationPendingOutput=null,automationSelectedNode=null,automationNodeCounter=0;
         function setupAutomationGraph(){
             const graph=ensureAutomationGraph();
+            document.getElementById("automation-add-type")?.addEventListener("change",updateAutomationNodePrice);
+            updateAutomationNodePrice();
             graph.nodes.forEach(n=>{const match=String(n.id).match(/_(\d+)$/);if(match)automationNodeCounter=Math.max(automationNodeCounter,Number(match[1]));});
-            document.getElementById("automation-add-node")?.addEventListener("click",()=>{const type=document.getElementById("automation-add-type").value,g=ensureAutomationGraph();let id;do{id=type+"_"+(++automationNodeCounter);}while(g.nodes.some(n=>n.id===id));g.nodes.push({id:id,type:type,x:35+(g.nodes.length%4)*255,y:440+Math.floor(g.nodes.length/4)*120,share:50,threshold:10,reserve:100,tier:1,tierStart:3,tierEnd:5,efficiency:15});automationSelectedNode=id;automationSaveGraph();});
+            document.getElementById("automation-add-node")?.addEventListener("click",()=>{const type=document.getElementById("automation-add-type").value,g=ensureAutomationGraph(),cost=AUTOMATION_NODE_COSTS[type]||0;if(!automationUnlocked()){alert("Automation unlocks at Core Rank III.");return;}if(!cost||game.cash<cost){alert("Not enough funds to purchase this automation node.");return;}game.cash-=cost;let id;do{id=type+"_"+(++automationNodeCounter);}while(g.nodes.some(n=>n.id===id));g.nodes.push({id:id,type:type,x:35+(g.nodes.length%4)*255,y:440+Math.floor(g.nodes.length/4)*120,share:50,threshold:10,reserve:100,tier:1,tierStart:3,tierEnd:5,efficiency:15});automationSelectedNode=id;automationSaveGraph();updateAutomationNodePrice();});
             document.getElementById("automation-clear-link")?.addEventListener("click",()=>{automationPendingOutput=null;renderAutomationGraph();});
             document.getElementById("automation-reset-graph")?.addEventListener("click",()=>{if(confirm("Replace your current graph with the example layout?")){game.automation.graph=defaultAutomationGraph();automationPendingOutput=null;automationSaveGraph();}});
             renderAutomationGraph();
