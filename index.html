@@ -958,7 +958,7 @@ ORE_TIERS.forEach((tier,index)=>{
             game.totalCoreEssenceEarned=Math.max(0,Number(game.totalCoreEssenceEarned)||0);
             if(!game.totalCoreEssenceEarned&&legacyRank)game.totalCoreEssenceEarned=CORE_RANKS[legacyRank-1].essence;
             game.totalCoreEssenceEarned=Math.max(game.totalCoreEssenceEarned,game.prestigeTokens);
-            if(game.runCashEarned===undefined||!Number.isFinite(Number(game.runCashEarned)))game.runCashEarned=game.totalCashEarned||0;
+            if(game.runCashEarned===undefined||!Number.isFinite(Number(game.runCashEarned)))game.runCashEarned=game.cash||0;
             ensureInfiniteCoreRankDefinitions();
         }
 
@@ -1166,7 +1166,7 @@ ORE_TIERS.forEach((tier,index)=>{
                 });
                 const head=el.querySelector(".power-node-head");let drag=null;
                 head.addEventListener("pointerdown",e=>{drag={x:e.clientX,y:e.clientY,nx:n.x,ny:n.y};head.setPointerCapture(e.pointerId);});
-                head.addEventListener("pointermove",e=>{if(!drag)return;el.style.left=Math.max(0,drag.nx+(e.clientX-drag.x)/powerGraphZoom)+"px";el.style.top=Math.max(0,drag.ny+(e.clientY-drag.y)/powerGraphZoom)+"px";});
+                head.addEventListener("pointermove",e=>{if(!drag)return;const x=Math.max(0,drag.nx+(e.clientX-drag.x)/powerGraphZoom),y=Math.max(0,drag.ny+(e.clientY-drag.y)/powerGraphZoom);el.style.left=x+"px";el.style.top=y+"px";game.powerGrid.nodePositions=game.powerGrid.nodePositions||{};game.powerGrid.nodePositions[n.id]={x,y};renderPowerWiresOnly();});
                 head.addEventListener("pointerup",e=>{if(!drag)return;const x=Math.max(0,drag.nx+(e.clientX-drag.x)/powerGraphZoom),y=Math.max(0,drag.ny+(e.clientY-drag.y)/powerGraphZoom);game.powerGrid.nodePositions=game.powerGrid.nodePositions||{};game.powerGrid.nodePositions[n.id]={x,y};drag=null;saveGame();renderPowerGraph();});
                 root.appendChild(el);
             });
