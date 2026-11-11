@@ -296,7 +296,8 @@
         .core-rank-progress span{display:block;height:100%;background:#29945a}
         @keyframes flow-dash{to{stroke-dashoffset:-34}}
         @media(max-width:600px){#automation-graph-viewport{height:520px}}
-    </style>
+    .power-wire-ports{margin:7px 0;padding:6px;border:1px solid #cbd5e1;background:#f8fafc}.power-wire-ports button{margin:2px 4px 2px 0}.power-wire-ports button.active{background:#dbeafe;border-color:#2563eb;color:#1e40af}#power-bus-controls{padding:8px;border:1px solid #94a3b8;background:#f8fafc;margin:8px 0}
+        </style>
 </head>
 <body>
 
@@ -384,7 +385,7 @@
                     <tr><td>Contract terminal</td><td id="power-contract-demand">0 W</td><td id="power-contract-allocated">0 W</td><td id="power-contract-status">Standby</td></tr>
                 </table>
                 <p><label>Power allocation priority: <select id="power-priority"><option value="miners">Mining first</option><option value="automation">Automation first</option><option value="contracts">Contracts first</option></select></label></p>
-                <p>Power is a shared budget. Output changes with daylight and fuel. Set priorities, build sources, and automate fuel selection. Connect whitelist/blacklist nodes into the miner line; bound whitelist nodes allow only their selected fuel, while blacklist nodes exclude it.</p><div id="power-plant-workshop" class="infobox"><h3>Power Plant Construction Mode</h3><p><button id="power-build-mode" type="button">Enter power building mode</button> <span id="power-build-status">Mode: normal</span></p><p>Available sources: <span id="power-build-options"></span></p><div id="power-plant-list"></div></div>
+                <p>Power is a shared budget. Output changes with daylight and fuel. Set priorities, build sources, and automate fuel selection. Connect whitelist/blacklist nodes into the miner line; bound whitelist nodes allow only their selected fuel, while blacklist nodes exclude it.</p><div class="infobox" id="power-wiring-panel"><h3>Power Wiring Board</h3><p>Generators feed the Main Bus through individual output cables. Connect the bus to each consumer to deliver power. Higher-rank generators have more output ports; every port must be wired for full output.</p><div id="power-bus-controls"></div><p id="power-wire-status">Select a generator output port, then connect it to the Main Bus.</p></div><div id="power-plant-workshop" class="infobox"><h3>Power Plant Construction Mode</h3><p><button id="power-build-mode" type="button">Enter power building mode</button> <span id="power-build-status">Mode: normal</span></p><p>Available sources: <span id="power-build-options"></span></p><div id="power-plant-list"></div></div>
             </div>
         </div>
 
@@ -807,7 +808,7 @@ ORE_TIERS.forEach((tier,index)=>{
             powerOutageActive: false,
             powerOutputMult: 1.0,
             powerStability: 0,
-            powerGrid: { priority: "miners" },
+            powerGrid: { priority: "miners", busConsumers: { miners:true, automation:false, contracts:false } },
             powerPlants: [{id:1,type:"solar",name:"Solar Array",level:1,active:true,fuelPolicy:"whitelist",fuelOre:"coal"}], nextPowerPlantId:2, powerClock:0, powerPlantOutput:0,
             powerRatios: { miners: 1, automation: 1, contracts: 1 },
             automation: { graph:null, policy:"balanced", reserve:0, minBatch:1, marketShare:100 },
@@ -1093,6 +1094,27 @@ ORE_TIERS.forEach((tier,index)=>{
 
         const POWER_PLANT_TYPES={solar:{name:"Solar Array",watts:14,cost:250,rank:0,mode:"passive",desc:"Daylight-dependent passive output."},solarFarm:{name:"Solar Farm",watts:75,cost:18000,rank:8,mode:"passive",desc:"Large passive solar array."},coal:{name:"Coal Generator",watts:42,cost:2200,rank:3,mode:"fuel",fuel:"coal",rate:.35,desc:"Consumes coal from inventory."},nuclear:{name:"Nuclear Plant",watts:180,cost:180000,rank:6,mode:"fuel",fuel:"uranium",rate:.08,desc:"Consumes uranium from inventory."},geothermal:{name:"Geothermal Station",watts:95,cost:95000,rank:10,mode:"passive",desc:"Stable passive output."},fusion:{name:"Fusion Reactor",watts:650,cost:2500000,rank:10,mode:"passive",desc:"Very high passive output."},tidal:{name:"Tidal Turbine",watts:110,cost:42000,rank:2,mode:"passive",desc:"Tide-dependent passive output."},antimatter:{name:"Antimatter Converter",watts:900,cost:9e9,rank:5,mode:"fuel",fuel:"antimatter",rate:.015,desc:"Consumes Antimatter Capsules."},dyson:{name:"Dyson Collector",watts:4200,cost:8e12,rank:7,mode:"passive",desc:"Collects stellar output."},vacuum:{name:"Vacuum Energy Tap",watts:18000,cost:6e17,rank:8,mode:"passive",desc:"Extracts quantum vacuum energy."},stellar:{name:"Stellar Engine",watts:95000,cost:5e22,rank:9,mode:"passive",desc:"Uses stellar mass to sustain output."},singularity:{name:"Singularity Plant",watts:600000,cost:2e28,rank:9,mode:"fuel",fuel:"dark_matter",rate:.006,desc:"Consumes Dark Matter."},zeroPoint:{name:"Zero-Point Array",watts:4e7,cost:1e35,rank:10,mode:"passive",desc:"Massive zero-point generator."},realityTap:{name:"Reality Tap",watts:2e9,cost:1e43,rank:10,mode:"fuel",fuel:"origin_core",rate:.0001,desc:"Consumes Origin Cores."},stellarForge:{name:"Stellar Forge",watts:2e11,cost:1e49,rank:11,mode:"passive",desc:"Converts stellar pressure into immense grid output."},multiverseReactor:{name:"Multiverse Reactor",watts:8e14,cost:1e61,rank:15,mode:"passive",desc:"Harvests energy across adjacent realities."},omniversalCore:{name:"Omniversal Core",watts:5e18,cost:1e77,rank:20,mode:"passive",desc:"An effectively limitless endgame power source."}};
         Object.values(POWER_PLANT_TYPES).forEach(plant => { plant.cost = Math.round(plant.cost * 8); });
+        // Cable complexity rises with generator technology. Each output port carries an equal share.
+        Object.entries(POWER_PLANT_TYPES).forEach(([,spec])=>{spec.wirePorts=spec.rank>=20?4:spec.rank>=10?3:spec.rank>=5?2:1;});
+        function ensurePowerWiring(){
+            if(!game.powerGrid)game.powerGrid={priority:"miners"};
+            if(!game.powerGrid.busConsumers)game.powerGrid.busConsumers={miners:true,automation:true,contracts:true};
+            (game.powerPlants||[]).forEach(p=>{if(!Array.isArray(p.wiredPorts))p.wiredPorts=[0];});
+        }
+        function powerPlantWiredFraction(plant){
+            const spec=POWER_PLANT_TYPES[plant.type];if(!spec)return 0;
+            const required=spec.wirePorts||1,ports=Array.isArray(plant.wiredPorts)?plant.wiredPorts:[];
+            return Math.min(1,new Set(ports.filter(n=>Number.isInteger(n)&&n>=0&&n<required)).size/required);
+        }
+        function togglePowerPort(plantId,port){
+            ensurePowerWiring();const p=game.powerPlants.find(x=>x.id===plantId);if(!p)return;
+            const wires=new Set(p.wiredPorts||[]);
+            if(wires.has(port))wires.delete(port);else wires.add(port);
+            p.wiredPorts=[...wires].sort((a,b)=>a-b);saveGame();renderPowerPlants();updateUIHUD();
+        }
+        function togglePowerConsumer(key,enabled){
+            ensurePowerWiring();game.powerGrid.busConsumers[key]=enabled;saveGame();renderPowerPlants();updateUIHUD();
+        }
         function powerPlantFuelAllowed(plant,id){
             const nodes=ensureAutomationGraph().nodes.filter(n=>(n.type==="whitelist"||n.type==="blacklist")&&automationNodeBound(n.id));
             const white=nodes.filter(n=>n.type==="whitelist"),black=nodes.filter(n=>n.type==="blacklist");
@@ -1101,7 +1123,7 @@ ORE_TIERS.forEach((tier,index)=>{
             if(nodes.length)return true;
             return (plant.fuelPolicy||"whitelist")==="whitelist"?id===(plant.fuelOre||"coal"):id!==(plant.fuelOre||"coal");
         }
-        function tickPowerPlants(dt){game.powerClock=(game.powerClock||0)+dt;let output=0;(game.powerPlants||[]).forEach(p=>{if(!p.active)return;const spec=POWER_PLANT_TYPES[p.type];if(!spec)return;let factor=1;if(p.type==="solar"||p.type==="solarFarm")factor=.25+.75*(.5+.5*Math.sin((game.powerClock%120)/120*Math.PI*2));if(spec.mode==="fuel"){const id=p.fuelOre||spec.fuel;let consumed=0;if(powerPlantFuelAllowed(p,id)){const amount=Math.min(game.inventory[id]||0,spec.rate*dt);game.inventory[id]=(game.inventory[id]||0)-amount;consumed=amount;}factor=dt>0?Math.min(1,consumed/(spec.rate*dt)):((game.inventory[id]||0)>0?1:0);}output+=spec.watts*factor*(p.level||1);});game.powerPlantOutput=output;return output;}
+        function tickPowerPlants(dt){ensurePowerWiring();game.powerClock=(game.powerClock||0)+dt;let output=0;(game.powerPlants||[]).forEach(p=>{if(!p.active)return;const spec=POWER_PLANT_TYPES[p.type];if(!spec)return;const wired=powerPlantWiredFraction(p);if(wired<=0)return;let factor=1;if(p.type==="solar"||p.type==="solarFarm")factor=.25+.75*(.5+.5*Math.sin((game.powerClock%120)/120*Math.PI*2));if(spec.mode==="fuel"){const id=p.fuelOre||spec.fuel;let consumed=0;if(powerPlantFuelAllowed(p,id)){const amount=Math.min(game.inventory[id]||0,spec.rate*dt);game.inventory[id]=(game.inventory[id]||0)-amount;consumed=amount;}factor=dt>0?Math.min(1,consumed/(spec.rate*dt)):((game.inventory[id]||0)>0?1:0);}output+=spec.watts*factor*(p.level||1)*wired;});game.powerPlantOutput=output;return output;}
 function setupPowerPlantControls(){
             const button=document.getElementById("power-build-mode");
             if(button)button.addEventListener("click",()=>{game.powerGrid.buildMode=!game.powerGrid.buildMode;button.textContent=game.powerGrid.buildMode?"Exit power building mode":"Enter power building mode";document.getElementById("power-build-status").textContent="Mode: "+(game.powerGrid.buildMode?"power construction":"normal");renderPowerPlants();});
@@ -1110,15 +1132,20 @@ function setupPowerPlantControls(){
             renderPowerPlants();
         }
         function renderPowerPlants(){
-            const root=document.getElementById("power-plant-list"),opts=document.getElementById("power-build-options");if(!root||!opts)return;
+            ensurePowerWiring();
+            const root=document.getElementById("power-plant-list"),opts=document.getElementById("power-build-options"),bus=document.getElementById("power-bus-controls");if(!root||!opts)return;
             const rank=getCoreRank(),available=Object.entries(POWER_PLANT_TYPES).filter(([,p])=>rank>=p.rank);
             opts.innerHTML=available.map(([id,p])=>'<button data-build-power="'+id+'" '+(game.cash<p.cost||!game.powerGrid?.buildMode?'disabled':'')+'>'+p.name+' ('+formatMoney(p.cost)+')</button>').join(" ");
-            root.innerHTML=(game.powerPlants||[]).map(p=>{const spec=POWER_PLANT_TYPES[p.type];if(!spec)return "";return '<div class="infobox"><strong>'+p.name+'</strong> — '+(p.active?'Online':'Offline')+' · '+spec.watts+' W · '+spec.desc+'<br><label><input type="checkbox" data-plant-active="'+p.id+'" '+(p.active?'checked':'')+'> Enabled</label> '+(spec.mode==="fuel"?'<label>Fuel rule <select data-plant-policy="'+p.id+'"><option value="whitelist" '+((p.fuelPolicy||"whitelist")==="whitelist"?"selected":"")+'>Whitelist</option><option value="blacklist" '+(p.fuelPolicy==="blacklist"?"selected":"")+'>Blacklist</option></select></label> <label>Fuel <select data-plant-fuel="'+p.id+'"><option value="coal">Coal</option><option value="uranium">Uranium</option><option value="antimatter">Antimatter Capsule</option><option value="dark_matter">Dark Matter Nugget</option><option value="origin_core">Origin Core</option></select></label>':'Passive source')+' <button data-plant-remove="'+p.id+'">Dismantle</button></div>';}).join("");
+            if(bus)bus.innerHTML='<p><strong>Main Bus → Consumers</strong></p>'+[{id:"miners",label:"Mining rigs"},{id:"automation",label:"Automation line"},{id:"contracts",label:"Contract terminal"}].map(c=>'<label style="display:inline-block;margin:4px 12px 4px 0"><input type="checkbox" data-bus-consumer="'+c.id+'" '+(game.powerGrid.busConsumers[c.id]?'checked':'')+'> '+c.label+'</label>').join("");
+            root.innerHTML=(game.powerPlants||[]).map(p=>{const spec=POWER_PLANT_TYPES[p.type];if(!spec)return "";const required=spec.wirePorts||1,wired=new Set(p.wiredPorts||[]);return '<div class="infobox"><strong>'+p.name+'</strong> — '+(p.active?'Online':'Offline')+' · '+spec.watts+' W · '+spec.desc+'<br><strong>Output cables:</strong> '+wired.size+'/'+required+' connected ('+Math.round(powerPlantWiredFraction(p)*100)+'% capacity)<div class="power-wire-ports">'+Array.from({length:required},(_,n)=>'<button type="button" data-power-port="'+p.id+':'+n+'" class="'+(wired.has(n)?'active':'')+'">'+(wired.has(n)?'Disconnect':'Connect')+' output '+(n+1)+'</button>').join(" ")+'</div><label><input type="checkbox" data-plant-active="'+p.id+'" '+(p.active?'checked':'')+'> Enabled</label> '+(spec.mode==="fuel"?'<label>Fuel rule <select data-plant-policy="'+p.id+'"><option value="whitelist" '+((p.fuelPolicy||"whitelist")==="whitelist"?"selected":"")+'>Whitelist</option><option value="blacklist" '+(p.fuelPolicy==="blacklist"?"selected":"")+'>Blacklist</option></select></label> <label>Fuel <select data-plant-fuel="'+p.id+'"><option value="coal">Coal</option><option value="uranium">Uranium</option><option value="antimatter">Antimatter Capsule</option><option value="dark_matter">Dark Matter Nugget</option><option value="origin_core">Origin Core</option></select></label>':'Passive source')+' <button data-plant-remove="'+p.id+'">Dismantle</button></div>';}).join("");
+            root.querySelectorAll("[data-power-port]").forEach(e=>e.addEventListener("click",()=>{const [plant,port]=e.dataset.powerPort.split(":").map(Number);togglePowerPort(plant,port);}));
+            bus?.querySelectorAll("[data-bus-consumer]").forEach(e=>e.addEventListener("change",()=>togglePowerConsumer(e.dataset.busConsumer,e.checked)));
             root.querySelectorAll("[data-plant-active]").forEach(e=>e.addEventListener("change",()=>{const p=game.powerPlants.find(x=>x.id===Number(e.dataset.plantActive));if(p)p.active=e.checked;saveGame();}));
             root.querySelectorAll("[data-plant-policy]").forEach(e=>e.addEventListener("change",()=>{const p=game.powerPlants.find(x=>x.id===Number(e.dataset.plantPolicy));if(p)p.fuelPolicy=e.value;saveGame();}));
             root.querySelectorAll("[data-plant-fuel]").forEach(e=>e.addEventListener("change",()=>{const p=game.powerPlants.find(x=>x.id===Number(e.dataset.plantFuel));if(p)p.fuelOre=e.value;saveGame();}));
-            root.querySelectorAll("[data-plant-remove]").forEach(e=>e.addEventListener("click",()=>{game.powerPlants=game.powerPlants.filter(x=>x.id!==Number(e.dataset.plantRemove));saveGame();renderPowerPlants();}));
-            opts.querySelectorAll("[data-build-power]").forEach(e=>e.addEventListener("click",()=>{const id=e.dataset.buildPower,spec=POWER_PLANT_TYPES[id];if(!game.powerGrid.buildMode||!spec||game.cash<spec.cost||rank<spec.rank)return;game.cash-=spec.cost;game.powerPlants.push({id:game.nextPowerPlantId++,type:id,name:spec.name,level:1,active:true,fuelPolicy:"whitelist",fuelOre:spec.fuel||"coal"});saveGame();renderPowerPlants();updateUIHUD();}));
+            root.querySelectorAll("[data-plant-remove]").forEach(e=>e.addEventListener("click",()=>{game.powerPlants=game.powerPlants.filter(x=>x.id!==Number(e.dataset.plantRemove));saveGame();renderPowerPlants();updateUIHUD();}));
+            opts.querySelectorAll("[data-build-power]").forEach(e=>e.addEventListener("click",()=>{const id=e.dataset.buildPower,spec=POWER_PLANT_TYPES[id];if(!game.powerGrid.buildMode||!spec||game.cash<spec.cost||rank<spec.rank)return;game.cash-=spec.cost;game.powerPlants.push({id:game.nextPowerPlantId++,type:id,name:spec.name,level:1,active:true,fuelPolicy:"whitelist",fuelOre:spec.fuel||"coal",wiredPorts:[]});saveGame();renderPowerPlants();updateUIHUD();}));
+            const status=document.getElementById("power-wire-status");if(status){const wired=(game.powerPlants||[]).reduce((n,p)=>n+(p.wiredPorts||[]).length,0);status.textContent=wired+" generator output cable(s) connected. Unwired ports produce no power.";}
         }
 
                 function updatePowerPlantBuildButtons(){
@@ -1128,6 +1155,7 @@ function setupPowerPlantControls(){
             root.querySelectorAll("[data-build-power]").forEach(button=>{const spec=POWER_PLANT_TYPES[button.dataset.buildPower];button.disabled=!game.powerGrid.buildMode||!spec||game.cash<spec.cost;});
         }
                 function calculatePowerAllocation() {
+            ensurePowerWiring();
             const base=(10+(game.upgrades["p_generator"]||0)*8)*Math.pow(1.10,game.upgrades["p_overdrive"]||0)*coreRankBonuses().power;
             const generated=base+(game.powerPlantOutput||0),g=ensureAutomationGraph();
             const connected=id=>automationNodeBound(id);
@@ -1137,8 +1165,10 @@ function setupPowerPlantControls(){
             const processPower=activeNodes.filter(n=>["crusher","smelter","refinery","resonator"].includes(n.type)).reduce((sum,n)=>sum+({crusher:2,smelter:3,refinery:5,resonator:4}[n.type]||0),0);
             const demandByType={miners:game.minersCount*6,automation:autoPath?2+activeNodes.length+processPower:0,contracts:contractPath?2:0},efficiency=1+Math.min(.25,(game.upgrades["p_stabilizer"]||0)*.0125);
             let available=generated;const ratios={miners:0,automation:0,contracts:0},order=game.powerGrid?.priority==="automation"?["automation","miners","contracts"]:game.powerGrid?.priority==="contracts"?["contracts","miners","automation"]:["miners","automation","contracts"];
-            order.forEach(key=>{const need=demandByType[key];if(!need){ratios[key]=1;return;}const supplied=Math.min(need,available*efficiency);ratios[key]=Math.max(0,Math.min(1,supplied/need));available=Math.max(0,available-supplied/efficiency);});
-            game.powerRatios=ratios;const demand=demandByType.miners+demandByType.automation+demandByType.contracts;return {generated,demand,surplus:available,demandByType,ratios};
+            order.forEach(key=>{const need=demandByType[key];if(!need){ratios[key]=1;return;}if(!game.powerGrid.busConsumers[key]){ratios[key]=0;return;}const supplied=Math.min(need,available*efficiency);ratios[key]=Math.max(0,Math.min(1,supplied/need));available=Math.max(0,available-supplied/efficiency);});
+            game.powerRatios=ratios;const demand=demandByType.miners+demandByType.automation+demandByType.contracts;
+            const plantPotential=(game.powerPlants||[]).reduce((sum,p)=>{const spec=POWER_PLANT_TYPES[p.type];return sum+(p.active&&spec?spec.watts*(p.level||1):0);},0);
+            return {generated,demand,surplus:available,demandByType,ratios,plantPotential};
         }
 
         function updateMiners(dt) {
@@ -2169,7 +2199,7 @@ function setupPowerPlantControls(){
                 ensureCoreRanks();
                 if (!game.automation) game.automation = {};
                 if (!game.automation.graph) game.automation.graph = defaultAutomationGraph();
-                if (!game.powerGrid) game.powerGrid = { priority:"miners" };
+                if (!game.powerGrid) game.powerGrid = { priority:"miners" }; ensurePowerWiring();
                 if (!Array.isArray(game.powerPlants)) game.powerPlants=[{id:1,type:"solar",name:"Solar Array",level:1,active:true,fuelPolicy:"whitelist",fuelOre:"coal"}];
                 game.nextPowerPlantId=game.nextPowerPlantId||Math.max(0,...game.powerPlants.map(p=>p.id||0))+1;
                 recalculateStats();
