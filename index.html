@@ -258,6 +258,15 @@
         .auto-wire{stroke:#72777d}
         .auto-wire:hover{stroke:#36c;stroke-width:4}
         #automation-toolbar{background:#f8f9fa}
+        #power-graph-viewport{height:590px;overflow:auto;position:relative;border:1px solid #a2a9b1;background-color:#fff;background-image:linear-gradient(rgba(0,0,0,.045) 1px,transparent 1px),linear-gradient(90deg,rgba(0,0,0,.045) 1px,transparent 1px);background-size:24px 24px;touch-action:pan-x pan-y}
+        #power-graph{position:relative;width:1500px;height:900px;transform-origin:top left}
+        #power-graph-wires{position:absolute;inset:0;width:100%;height:100%;pointer-events:auto;overflow:visible}
+        .power-node{position:absolute;width:220px;background:#fff;border:1px solid #72777d;color:#202122;z-index:2;font:12px Arial,sans-serif;user-select:none}
+        .power-node-head{padding:7px 9px;background:#eaecf0;border-bottom:1px solid #a2a9b1;cursor:grab;font-weight:bold;font-size:13px}
+        .power-node-body{padding:8px}.power-pin-row{display:flex;justify-content:space-between;align-items:center;gap:8px;min-height:24px;margin:3px 0}
+        .power-pin{width:14px;height:14px;padding:0;border-radius:50%;border:2px solid #a2a9b1;background:#f8f9fa;cursor:pointer;margin:0 3px;flex:0 0 14px}
+        .power-pin.output{background:#62c88a;border-color:#c7f4d8}.power-pin.pending{background:#f0c674}
+        .power-wire{fill:none;stroke:#62c88a;stroke-width:3;cursor:pointer;pointer-events:stroke}.power-wire:hover{stroke:#f0c674;stroke-width:5}
         #tab-power > .infobox{display:block;width:100%;box-sizing:border-box;margin:12px 0}#power-plant-list .infobox{display:block;width:100%;box-sizing:border-box;margin:8px 0}#power-build-options{display:flex;flex-direction:column;align-items:flex-start;gap:5px;margin-top:6px}#power-build-options button{min-width:220px;text-align:left}
 
         #automation-wires{position:absolute;inset:0;width:100%;height:100%;pointer-events:auto;overflow:visible}
@@ -385,7 +394,7 @@
                     <tr><td>Contract terminal</td><td id="power-contract-demand">0 W</td><td id="power-contract-allocated">0 W</td><td id="power-contract-status">Standby</td></tr>
                 </table>
                 <p><label>Power allocation priority: <select id="power-priority"><option value="miners">Mining first</option><option value="automation">Automation first</option><option value="contracts">Contracts first</option></select></label></p>
-                <p>Power is a shared budget. Output changes with daylight and fuel. Set priorities, build sources, and automate fuel selection. Connect whitelist/blacklist nodes into the miner line; bound whitelist nodes allow only their selected fuel, while blacklist nodes exclude it.</p><div class="infobox" id="power-wiring-panel"><h3>Power Wiring Board</h3><p>Generators feed the Main Bus through individual output cables. Connect the bus to each consumer to deliver power. Higher-rank generators have more output ports; every port must be wired for full output.</p><div id="power-bus-controls"></div><p id="power-wire-status">Select a generator output port, then connect it to the Main Bus.</p></div><div id="power-plant-workshop" class="infobox"><h3>Power Plant Construction Mode</h3><p><button id="power-build-mode" type="button">Enter power building mode</button> <span id="power-build-status">Mode: normal</span></p><p>Available sources: <span id="power-build-options"></span></p><div id="power-plant-list"></div></div>
+                <p>Power is a shared budget. Output changes with daylight and fuel. Set priorities, build sources, and automate fuel selection. Connect whitelist/blacklist nodes into the miner line; bound whitelist nodes allow only their selected fuel, while blacklist nodes exclude it.</p><div class="infobox" id="power-wiring-panel"><h3>Power Wiring Editor</h3><p>Connect generator output pins to the Main Bus, then connect bus outputs to mining, automation and contract inputs. Higher-rank generators expose more pins, so advanced plants need more wiring. Click a green output, then a white input; click a wire to remove it. Drag node headers to rearrange the board.</p><div class="automation-zoom"><button id="power-zoom-out" type="button">−</button><output id="power-zoom-level">100%</output><button id="power-zoom-in" type="button">+</button><button id="power-zoom-reset" type="button">Reset zoom</button></div><div id="power-graph-viewport"><div id="power-graph"><svg id="power-graph-wires" viewBox="0 0 1500 900"></svg></div></div><p id="power-wire-status">Select a generator output pin, then a Main Bus input.</p></div><div id="power-plant-workshop" class="infobox"><h3>Power Plant Construction Mode</h3><p><button id="power-build-mode" type="button">Enter power building mode</button> <span id="power-build-status">Mode: normal</span></p><p>Available sources: <span id="power-build-options"></span></p><div id="power-plant-list"></div></div>
             </div>
         </div>
 
@@ -792,6 +801,7 @@ ORE_TIERS.forEach((tier,index)=>{
         const game = {
             cash: 0,
             totalCashEarned: 0,
+            runCashEarned: 0,
             depthMeters: 1,
             unlockedTier: 1,
             totalRocksExcavated: 0,
@@ -808,7 +818,7 @@ ORE_TIERS.forEach((tier,index)=>{
             powerOutageActive: false,
             powerOutputMult: 1.0,
             powerStability: 0,
-            powerGrid: { priority: "miners", busConsumers: { miners:true, automation:false, contracts:false } },
+            powerGrid: { priority: "miners", busConsumers: { miners:true, automation:false, contracts:false }, links:null },
             powerPlants: [{id:1,type:"solar",name:"Solar Array",level:1,active:true,fuelPolicy:"whitelist",fuelOre:"coal"}], nextPowerPlantId:2, powerClock:0, powerPlantOutput:0,
             powerRatios: { miners: 1, automation: 1, contracts: 1 },
             automation: { graph:null, policy:"balanced", reserve:0, minBatch:1, marketShare:100 },
@@ -938,7 +948,7 @@ ORE_TIERS.forEach((tier,index)=>{
 
 
         function coreRankRoman(value){const pairs=[[1000,"M"],[900,"CM"],[500,"D"],[400,"CD"],[100,"C"],[90,"XC"],[50,"L"],[40,"XL"],[10,"X"],[9,"IX"],[5,"V"],[4,"IV"],[1,"I"]];let n=value,out="";pairs.forEach(([v,sym])=>{while(n>=v){out+=sym;n-=v;}});return out||String(value);}
-        function ensureInfiniteCoreRankDefinitions(){const total=Number(game.totalCoreEssenceEarned)||0;while(CORE_RANKS.length<1000&&(CORE_RANKS.length===0||CORE_RANKS[CORE_RANKS.length-1].essence<=total||CORE_RANKS.length<15)){const index=CORE_RANKS.length+1,previous=CORE_RANKS[CORE_RANKS.length-1],essence=previous?Math.min(Number.MAX_VALUE,previous.essence*2):12800;const slot=index%5===0?1:0,kind=index%4;const bonus=1.03;CORE_RANKS.push({title:coreRankRoman(index),name:["Ascendant","Void Architect","Continuum Keeper","Eternal Prospector"][kind]+" "+index,essence,perk:["Industrial Momentum","Deep Resonance","Market Dominion","Grid Mastery"][kind],effect:kind===0?"+3% ore sale value.":kind===1?"+3% mining speed.":kind===2?"+3% rare ore luck.":"+3% power generation.",cash:kind===0?bonus:1,speed:kind===1?bonus:1,luck:kind===2?bonus:1,power:kind===3?bonus:1,slots:slot,multi:index%5===0?.01:0,unlock:index===11?"Stellar Forge power infrastructure":index===15?"Multiverse Reactor power infrastructure":index===20?"Omniversal Core power infrastructure":slot?"+1 permanent miner slot and a new facility expansion":"A permanent 3% specialist bonus"});}}
+        function ensureInfiniteCoreRankDefinitions(){const total=Number(game.totalCoreEssenceEarned)||0;while(CORE_RANKS.length<1000&&(CORE_RANKS.length===0||CORE_RANKS[CORE_RANKS.length-1].essence<=total||CORE_RANKS.length<15)){const index=CORE_RANKS.length+1,previous=CORE_RANKS[CORE_RANKS.length-1],essence=previous?Math.min(Number.MAX_VALUE,previous.essence*3):12800;const slot=index%5===0?1:0,kind=index%4;const bonus=1.06,slotBonus=index%5===0?2:0,multiBonus=index%5===0?.03:0;CORE_RANKS.push({title:coreRankRoman(index),name:["Ascendant","Void Architect","Continuum Keeper","Eternal Prospector"][kind]+" "+index,essence,perk:["Industrial Momentum","Deep Resonance","Market Dominion","Grid Mastery"][kind],effect:kind===0?"+6% ore sale value.":kind===1?"+6% mining speed.":kind===2?"+6% rare ore luck.":"+6% power generation.",cash:kind===0?bonus:1,speed:kind===1?bonus:1,luck:kind===2?bonus:1,power:kind===3?bonus:1,slots:slotBonus,multi:multiBonus,unlock:index===11?"Stellar Forge power infrastructure":index===15?"Multiverse Reactor power infrastructure":index===20?"Omniversal Core power infrastructure":slotBonus?"+2 permanent miner slots and +3% multi-ore chance":"A permanent 6% specialist bonus"});}}
         function ensureCoreRanks() {
             if (!game.coreRanks || typeof game.coreRanks !== "object") game.coreRanks = {};
             for (let rank=1; rank<=10; rank++) game.coreRanks[rank] = Math.max(0, Math.floor(Number(game.coreRanks[rank]) || 0));
@@ -948,6 +958,7 @@ ORE_TIERS.forEach((tier,index)=>{
             game.totalCoreEssenceEarned=Math.max(0,Number(game.totalCoreEssenceEarned)||0);
             if(!game.totalCoreEssenceEarned&&legacyRank)game.totalCoreEssenceEarned=CORE_RANKS[legacyRank-1].essence;
             game.totalCoreEssenceEarned=Math.max(game.totalCoreEssenceEarned,game.prestigeTokens);
+            if(game.runCashEarned===undefined||!Number.isFinite(Number(game.runCashEarned)))game.runCashEarned=game.totalCashEarned||0;
             ensureInfiniteCoreRankDefinitions();
         }
 
@@ -1100,21 +1111,76 @@ ORE_TIERS.forEach((tier,index)=>{
             if(!game.powerGrid)game.powerGrid={priority:"miners"};
             if(!game.powerGrid.busConsumers)game.powerGrid.busConsumers={miners:true,automation:true,contracts:true};
             (game.powerPlants||[]).forEach(p=>{if(!Array.isArray(p.wiredPorts))p.wiredPorts=[0];});
+            if(!Array.isArray(game.powerGrid.links)){
+                game.powerGrid.links=[];
+                (game.powerPlants||[]).forEach(p=>(p.wiredPorts||[]).forEach(port=>game.powerGrid.links.push({from:"plant_"+p.id,out:port,to:"bus",input:0})));
+                Object.entries(game.powerGrid.busConsumers).forEach(([key,on])=>{if(on)game.powerGrid.links.push({from:"bus",out:["miners","automation","contracts"].indexOf(key),to:"consumer_"+key,input:0});});
+            }
+            game.powerGrid.busConsumers={miners:powerConsumerConnected("miners"),automation:powerConsumerConnected("automation"),contracts:powerConsumerConnected("contracts")};
         }
-        function powerPlantWiredFraction(plant){
-            const spec=POWER_PLANT_TYPES[plant.type];if(!spec)return 0;
-            const required=spec.wirePorts||1,ports=Array.isArray(plant.wiredPorts)?plant.wiredPorts:[];
-            return Math.min(1,new Set(ports.filter(n=>Number.isInteger(n)&&n>=0&&n<required)).size/required);
+        function powerConsumerConnected(key){return Array.isArray(game.powerGrid?.links)&&game.powerGrid.links.some(l=>l.from==="bus"&&l.to==="consumer_"+key);}
+        function powerPlantWiredFraction(plant){const spec=POWER_PLANT_TYPES[plant.type];if(!spec)return 0;const count=new Set((game.powerGrid?.links||[]).filter(l=>l.from==="plant_"+plant.id&&l.to==="bus").map(l=>l.out)).size;return Math.min(1,count/(spec.wirePorts||1));}
+        let powerPendingOutput=null,powerGraphZoom=1;
+        function powerNodePositions(){
+            const plants=game.powerPlants||[],saved=game.powerGrid?.nodePositions||{};
+            const nodes=[...plants.map((p,i)=>({id:"plant_"+p.id,type:"plant",plant:p,x:25,y:25+i*185})),{id:"bus",type:"bus",x:590,y:310},{id:"consumer_miners",type:"consumer",key:"miners",label:"Mining Rigs",x:1120,y:80},{id:"consumer_automation",type:"consumer",key:"automation",label:"Automation Line",x:1120,y:330},{id:"consumer_contracts",type:"consumer",key:"contracts",label:"Contract Terminal",x:1120,y:580}];
+            nodes.forEach(n=>{const savedPos=saved[n.id];if(savedPos){n.x=savedPos.x;n.y=savedPos.y;}else if(n.type==="plant"&&Number.isFinite(n.plant.powerX)&&Number.isFinite(n.plant.powerY)){n.x=n.plant.powerX;n.y=n.plant.powerY;}});return nodes;
         }
-        function togglePowerPort(plantId,port){
-            ensurePowerWiring();const p=game.powerPlants.find(x=>x.id===plantId);if(!p)return;
-            const wires=new Set(p.wiredPorts||[]);
-            if(wires.has(port))wires.delete(port);else wires.add(port);
-            p.wiredPorts=[...wires].sort((a,b)=>a-b);saveGame();renderPowerPlants();updateUIHUD();
+        function renderPowerWiresOnly(){
+            const svg=document.getElementById("power-graph-wires");if(!svg)return;svg.innerHTML="";
+            const nodes=powerNodePositions(),pos=Object.fromEntries(nodes.map(n=>[n.id,n]));
+            (game.powerGrid.links||[]).forEach((l,i)=>{const a=pos[l.from],b=pos[l.to];if(!a||!b)return;
+                const ay=a.y+(a.type==="plant"?82+(l.out||0)*24:a.type==="bus"?105+(l.out||0)*28:64);
+                const by=b.y+(b.type==="bus"?78:64),ax=a.x+220,bx=b.x;
+                const path=document.createElementNS("http://www.w3.org/2000/svg","path");
+                path.setAttribute("d","M "+ax+" "+ay+" C "+(ax+90)+" "+ay+", "+(bx-90)+" "+by+", "+bx+" "+by);
+                path.setAttribute("class","power-wire");path.addEventListener("click",()=>{game.powerGrid.links.splice(i,1);ensurePowerWiring();saveGame();renderPowerPlants();updateUIHUD();});svg.appendChild(path);
+            });
         }
-        function togglePowerConsumer(key,enabled){
-            ensurePowerWiring();game.powerGrid.busConsumers[key]=enabled;saveGame();renderPowerPlants();updateUIHUD();
+        function renderPowerGraph(){
+            const root=document.getElementById("power-graph");if(!root)return;
+            root.querySelectorAll(".power-node").forEach(n=>n.remove());
+            const nodes=powerNodePositions();root.style.height=Math.max(900,(game.powerPlants||[]).length*185+150)+"px";
+            const svg=document.getElementById("power-graph-wires");if(svg)svg.setAttribute("viewBox","0 0 1500 "+Math.max(900,(game.powerPlants||[]).length*185+150));
+            nodes.forEach(n=>{
+                const el=document.createElement("div");el.className="power-node";el.dataset.node=n.id;el.style.left=n.x+"px";el.style.top=n.y+"px";
+                let body="";
+                if(n.type==="plant"){
+                    const spec=POWER_PLANT_TYPES[n.plant.type],ports=spec?.wirePorts||1;
+                    body="<div>"+(spec?.desc||"Generator")+"</div><div><strong>"+formatNumber(spec?.watts||0)+" W</strong> nominal output</div>";
+                    for(let p=0;p<ports;p++)body+='<div class="power-pin-row"><span>Output '+(p+1)+'</span><button class="power-pin output '+(powerPendingOutput?.node===n.id&&powerPendingOutput?.port===p?"pending":"")+'" data-power-pin="out" data-port="'+p+'"></button></div>';
+                }else if(n.type==="bus"){
+                    body="<div>Combines connected generation and distributes available power.</div><div class=\"power-pin-row\"><button class=\"power-pin\" data-power-pin=\"in\"></button><span>Generator inputs · multi-wire</span></div>";
+                    ["Mining rigs","Automation line","Contract terminal"].forEach((label,i)=>{body+='<div class="power-pin-row"><span>'+label+'</span><button class="power-pin output '+(powerPendingOutput?.node===n.id&&powerPendingOutput?.port===i?"pending":"")+'" data-power-pin="out" data-port="'+i+'"></button></div>';});
+                }else body="<div>Power consumer input</div><div class=\"power-pin-row\"><button class=\"power-pin\" data-power-pin=\"in\"></button><span>"+n.label+"</span></div>";
+                const title=n.type==="plant"?n.plant.name:n.type==="bus"?"MAIN POWER BUS":n.label;
+                el.innerHTML='<div class="power-node-head">'+title+'</div><div class="power-node-body">'+body+'</div>';
+                el.addEventListener("click",e=>{
+                    const pin=e.target.closest("[data-power-pin]");if(!pin)return;e.stopPropagation();
+                    if(pin.dataset.powerPin==="out"){powerPendingOutput={node:n.id,port:Number(pin.dataset.port||0)};renderPowerGraph();return;}
+                    if(!powerPendingOutput)return;
+                    const from=powerPendingOutput.node,to=n.id,port=powerPendingOutput.port;
+                    const valid=(from.startsWith("plant_")&&to==="bus")||(from==="bus"&&to.startsWith("consumer_"));
+                    if(valid&&!game.powerGrid.links.some(l=>l.from===from&&l.to===to&&l.out===port))game.powerGrid.links.push({from,to,out:port,input:0});
+                    powerPendingOutput=null;ensurePowerWiring();saveGame();renderPowerPlants();updateUIHUD();
+                });
+                const head=el.querySelector(".power-node-head");let drag=null;
+                head.addEventListener("pointerdown",e=>{drag={x:e.clientX,y:e.clientY,nx:n.x,ny:n.y};head.setPointerCapture(e.pointerId);});
+                head.addEventListener("pointermove",e=>{if(!drag)return;el.style.left=Math.max(0,drag.nx+(e.clientX-drag.x)/powerGraphZoom)+"px";el.style.top=Math.max(0,drag.ny+(e.clientY-drag.y)/powerGraphZoom)+"px";});
+                head.addEventListener("pointerup",e=>{if(!drag)return;const x=Math.max(0,drag.nx+(e.clientX-drag.x)/powerGraphZoom),y=Math.max(0,drag.ny+(e.clientY-drag.y)/powerGraphZoom);game.powerGrid.nodePositions=game.powerGrid.nodePositions||{};game.powerGrid.nodePositions[n.id]={x,y};drag=null;saveGame();renderPowerGraph();});
+                root.appendChild(el);
+            });
+            renderPowerWiresOnly();
+            const status=document.getElementById("power-wire-status");if(status)status.textContent=powerPendingOutput?"Choose an input pin to complete the cable.":game.powerGrid.links.length+" cable connection(s) active. Click a wire to disconnect it.";
         }
+        function setupPowerGraphZoom(){
+            const set=v=>{powerGraphZoom=Math.max(.5,Math.min(1.75,v));const graph=document.getElementById("power-graph"),out=document.getElementById("power-zoom-level");if(graph)graph.style.transform="scale("+powerGraphZoom+")";if(out)out.textContent=Math.round(powerGraphZoom*100)+"%";};
+            document.getElementById("power-zoom-in")?.addEventListener("click",()=>set(powerGraphZoom+.1));
+            document.getElementById("power-zoom-out")?.addEventListener("click",()=>set(powerGraphZoom-.1));
+            document.getElementById("power-zoom-reset")?.addEventListener("click",()=>set(1));set(1);
+        }
+        function togglePowerPort(plantId,port){const id="plant_"+plantId,links=game.powerGrid.links,index=links.findIndex(l=>l.from===id&&l.to==="bus"&&l.out===port);if(index>=0)links.splice(index,1);else links.push({from:id,to:"bus",out:port,input:0});ensurePowerWiring();saveGame();renderPowerPlants();updateUIHUD();}
+        function togglePowerConsumer(key,enabled){const links=game.powerGrid.links,index=links.findIndex(l=>l.from==="bus"&&l.to==="consumer_"+key);if(enabled&&index<0)links.push({from:"bus",to:"consumer_"+key,out:["miners","automation","contracts"].indexOf(key),input:0});if(!enabled&&index>=0)links.splice(index,1);ensurePowerWiring();saveGame();renderPowerPlants();updateUIHUD();}
         function powerPlantFuelAllowed(plant,id){
             const nodes=ensureAutomationGraph().nodes.filter(n=>(n.type==="whitelist"||n.type==="blacklist")&&automationNodeBound(n.id));
             const white=nodes.filter(n=>n.type==="whitelist"),black=nodes.filter(n=>n.type==="blacklist");
@@ -1125,6 +1191,7 @@ ORE_TIERS.forEach((tier,index)=>{
         }
         function tickPowerPlants(dt){ensurePowerWiring();game.powerClock=(game.powerClock||0)+dt;let output=0;(game.powerPlants||[]).forEach(p=>{if(!p.active)return;const spec=POWER_PLANT_TYPES[p.type];if(!spec)return;const wired=powerPlantWiredFraction(p);if(wired<=0)return;let factor=1;if(p.type==="solar"||p.type==="solarFarm")factor=.25+.75*(.5+.5*Math.sin((game.powerClock%120)/120*Math.PI*2));if(spec.mode==="fuel"){const id=p.fuelOre||spec.fuel;let consumed=0;if(powerPlantFuelAllowed(p,id)){const fuelNeed=spec.rate*dt*wired;const amount=Math.min(game.inventory[id]||0,fuelNeed);game.inventory[id]=(game.inventory[id]||0)-amount;consumed=amount;}factor=dt>0?Math.min(1,consumed/(spec.rate*dt*wired)):((game.inventory[id]||0)>0?1:0);}output+=spec.watts*factor*(p.level||1)*wired;});game.powerPlantOutput=output;return output;}
 function setupPowerPlantControls(){
+            setupPowerGraphZoom();
             const button=document.getElementById("power-build-mode");
             if(button)button.addEventListener("click",()=>{game.powerGrid.buildMode=!game.powerGrid.buildMode;button.textContent=game.powerGrid.buildMode?"Exit power building mode":"Enter power building mode";document.getElementById("power-build-status").textContent="Mode: "+(game.powerGrid.buildMode?"power construction":"normal");renderPowerPlants();});
             if(button)button.textContent=game.powerGrid.buildMode?"Exit power building mode":"Enter power building mode";
@@ -1133,22 +1200,20 @@ function setupPowerPlantControls(){
         }
         function renderPowerPlants(){
             ensurePowerWiring();
-            const root=document.getElementById("power-plant-list"),opts=document.getElementById("power-build-options"),bus=document.getElementById("power-bus-controls");if(!root||!opts)return;
+            const root=document.getElementById("power-plant-list"),opts=document.getElementById("power-build-options");if(!root||!opts)return;
             const rank=getCoreRank(),available=Object.entries(POWER_PLANT_TYPES).filter(([,p])=>rank>=p.rank);
             opts.innerHTML=available.map(([id,p])=>'<button data-build-power="'+id+'" '+(game.cash<p.cost||!game.powerGrid?.buildMode?'disabled':'')+'>'+p.name+' ('+formatMoney(p.cost)+')</button>').join(" ");
-            if(bus)bus.innerHTML='<p><strong>Main Bus → Consumers</strong></p>'+[{id:"miners",label:"Mining rigs"},{id:"automation",label:"Automation line"},{id:"contracts",label:"Contract terminal"}].map(c=>'<label style="display:inline-block;margin:4px 12px 4px 0"><input type="checkbox" data-bus-consumer="'+c.id+'" '+(game.powerGrid.busConsumers[c.id]?'checked':'')+'> '+c.label+'</label>').join("");
-            root.innerHTML=(game.powerPlants||[]).map(p=>{const spec=POWER_PLANT_TYPES[p.type];if(!spec)return "";const required=spec.wirePorts||1,wired=new Set(p.wiredPorts||[]);return '<div class="infobox"><strong>'+p.name+'</strong> — '+(p.active?'Online':'Offline')+' · '+spec.watts+' W · '+spec.desc+'<br><strong>Output cables:</strong> '+wired.size+'/'+required+' connected ('+Math.round(powerPlantWiredFraction(p)*100)+'% capacity)<div class="power-wire-ports">'+Array.from({length:required},(_,n)=>'<button type="button" data-power-port="'+p.id+':'+n+'" class="'+(wired.has(n)?'active':'')+'">'+(wired.has(n)?'Disconnect':'Connect')+' output '+(n+1)+'</button>').join(" ")+'</div><label><input type="checkbox" data-plant-active="'+p.id+'" '+(p.active?'checked':'')+'> Enabled</label> '+(spec.mode==="fuel"?'<label>Fuel rule <select data-plant-policy="'+p.id+'"><option value="whitelist" '+((p.fuelPolicy||"whitelist")==="whitelist"?"selected":"")+'>Whitelist</option><option value="blacklist" '+(p.fuelPolicy==="blacklist"?"selected":"")+'>Blacklist</option></select></label> <label>Fuel <select data-plant-fuel="'+p.id+'"><option value="coal">Coal</option><option value="uranium">Uranium</option><option value="antimatter">Antimatter Capsule</option><option value="dark_matter">Dark Matter Nugget</option><option value="origin_core">Origin Core</option></select></label>':'Passive source')+' <button data-plant-remove="'+p.id+'">Dismantle</button></div>';}).join("");
-            root.querySelectorAll("[data-power-port]").forEach(e=>e.addEventListener("click",()=>{const [plant,port]=e.dataset.powerPort.split(":").map(Number);togglePowerPort(plant,port);}));
-            bus?.querySelectorAll("[data-bus-consumer]").forEach(e=>e.addEventListener("change",()=>togglePowerConsumer(e.dataset.busConsumer,e.checked)));
+            renderPowerGraph();
+            root.innerHTML=(game.powerPlants||[]).map(p=>{const spec=POWER_PLANT_TYPES[p.type];if(!spec)return "";return '<div class="infobox"><strong>'+p.name+'</strong> — '+(p.active?'Online':'Offline')+' · '+spec.watts+' W · '+spec.desc+'<br><strong>Wiring:</strong> '+Math.round(powerPlantWiredFraction(p)*100)+'% capacity via graph<br><label><input type="checkbox" data-plant-active="'+p.id+'" '+(p.active?'checked':'')+'> Enabled</label> '+(spec.mode==="fuel"?'<label>Fuel rule <select data-plant-policy="'+p.id+'"><option value="whitelist" '+((p.fuelPolicy||"whitelist")==="whitelist"?"selected":"")+'>Whitelist</option><option value="blacklist" '+(p.fuelPolicy==="blacklist"?"selected":"")+'>Blacklist</option></select></label> <label>Fuel <select data-plant-fuel="'+p.id+'"><option value="coal">Coal</option><option value="uranium">Uranium</option><option value="antimatter">Antimatter Capsule</option><option value="dark_matter">Dark Matter Nugget</option><option value="origin_core">Origin Core</option></select></label>':'Passive source')+' <button data-plant-remove="'+p.id+'">Dismantle</button></div>';}).join("");
             root.querySelectorAll("[data-plant-active]").forEach(e=>e.addEventListener("change",()=>{const p=game.powerPlants.find(x=>x.id===Number(e.dataset.plantActive));if(p)p.active=e.checked;saveGame();}));
             root.querySelectorAll("[data-plant-policy]").forEach(e=>e.addEventListener("change",()=>{const p=game.powerPlants.find(x=>x.id===Number(e.dataset.plantPolicy));if(p)p.fuelPolicy=e.value;saveGame();}));
             root.querySelectorAll("[data-plant-fuel]").forEach(e=>e.addEventListener("change",()=>{const p=game.powerPlants.find(x=>x.id===Number(e.dataset.plantFuel));if(p)p.fuelOre=e.value;saveGame();}));
-            root.querySelectorAll("[data-plant-remove]").forEach(e=>e.addEventListener("click",()=>{game.powerPlants=game.powerPlants.filter(x=>x.id!==Number(e.dataset.plantRemove));saveGame();renderPowerPlants();updateUIHUD();}));
+            root.querySelectorAll("[data-plant-remove]").forEach(e=>e.addEventListener("click",()=>{const id=Number(e.dataset.plantRemove);game.powerPlants=game.powerPlants.filter(x=>x.id!==id);game.powerGrid.links=game.powerGrid.links.filter(l=>l.from!=="plant_"+id);saveGame();renderPowerPlants();updateUIHUD();}));
             opts.querySelectorAll("[data-build-power]").forEach(e=>e.addEventListener("click",()=>{const id=e.dataset.buildPower,spec=POWER_PLANT_TYPES[id];if(!game.powerGrid.buildMode||!spec||game.cash<spec.cost||rank<spec.rank)return;game.cash-=spec.cost;game.powerPlants.push({id:game.nextPowerPlantId++,type:id,name:spec.name,level:1,active:true,fuelPolicy:"whitelist",fuelOre:spec.fuel||"coal",wiredPorts:[]});saveGame();renderPowerPlants();updateUIHUD();}));
-            const status=document.getElementById("power-wire-status");if(status){const wired=(game.powerPlants||[]).reduce((n,p)=>n+(p.wiredPorts||[]).length,0);status.textContent=wired+" generator output cable(s) connected. Unwired ports produce no power.";}
+            const status=document.getElementById("power-wire-status");if(status)status.textContent=game.powerGrid.links.length+" cable connection(s) active in the visual circuit.";
         }
 
-                function updatePowerPlantBuildButtons(){
+        function updatePowerPlantBuildButtons(){
             const root=document.getElementById("power-build-options");if(!root)return;
             const unlocked=Object.entries(POWER_PLANT_TYPES).filter(([,p])=>getCoreRank()>=p.rank);
             if(root.children.length!==unlocked.length){renderPowerPlants();return;}
@@ -1165,7 +1230,7 @@ function setupPowerPlantControls(){
             const processPower=activeNodes.filter(n=>["crusher","smelter","refinery","resonator"].includes(n.type)).reduce((sum,n)=>sum+({crusher:2,smelter:3,refinery:5,resonator:4}[n.type]||0),0);
             const demandByType={miners:game.minersCount*6,automation:autoPath?2+activeNodes.length+processPower:0,contracts:contractPath?2:0},efficiency=1+Math.min(.25,(game.upgrades["p_stabilizer"]||0)*.0125);
             let available=generated;const ratios={miners:0,automation:0,contracts:0},order=game.powerGrid?.priority==="automation"?["automation","miners","contracts"]:game.powerGrid?.priority==="contracts"?["contracts","miners","automation"]:["miners","automation","contracts"];
-            order.forEach(key=>{const need=demandByType[key];if(!need){ratios[key]=1;return;}if(!game.powerGrid.busConsumers[key]){ratios[key]=0;return;}const supplied=Math.min(need,available*efficiency);ratios[key]=Math.max(0,Math.min(1,supplied/need));available=Math.max(0,available-supplied/efficiency);});
+            order.forEach(key=>{const need=demandByType[key];if(!need){ratios[key]=1;return;}if(!powerConsumerConnected(key)){ratios[key]=0;return;}const supplied=Math.min(need,available*efficiency);ratios[key]=Math.max(0,Math.min(1,supplied/need));available=Math.max(0,available-supplied/efficiency);});
             game.powerRatios=ratios;const demand=demandByType.miners+demandByType.automation+demandByType.contracts;
             const plantPotential=(game.powerPlants||[]).reduce((sum,p)=>{const spec=POWER_PLANT_TYPES[p.type];return sum+(p.active&&spec?spec.watts*(p.level||1):0);},0);
             return {generated,demand,surplus:available,demandByType,ratios,plantPotential};
@@ -1298,7 +1363,7 @@ function setupPowerPlantControls(){
         };
         function defaultAutomationGraph(){return {nodes:[{id:"miners",type:"miners",x:35,y:100}],links:[]};}
         const AUTOMATION_NODE_COSTS={sorter:150000,filter:300000,splitter:450000,buffer:400000,storage:650000,market:800000,sell:550000,contract:1200000,crusher:2000000,smelter:5000000,refinery:12000000,resonator:20000000,whitelist:900000,blacklist:900000};
-        function automationUnlocked(){return getCoreRank()>=3;}
+        function automationUnlocked(){return getCoreRank()>=2;}
         function updateAutomationUnlockUI(){const tab=document.getElementById("automation-nav-tab");if(tab)tab.classList.toggle("hidden",!automationUnlocked());}
         function updateAutomationNodePrice(){const type=document.getElementById("automation-add-type")?.value,cost=AUTOMATION_NODE_COSTS[type]||0,price=document.getElementById("automation-node-price"),button=document.getElementById("automation-add-node");if(price)price.textContent=cost?"Cost: "+formatMoney(cost):"";if(button)button.disabled=!automationUnlocked()||game.cash<cost;}
         function ensureAutomationGraph(){if(!game.automation)game.automation={};if(!game.automation.graph||!Array.isArray(game.automation.graph.nodes))game.automation.graph=defaultAutomationGraph();return game.automation.graph;}
@@ -1334,7 +1399,7 @@ function setupPowerPlantControls(){
             document.getElementById("automation-add-type")?.addEventListener("change",updateAutomationNodePrice);
             updateAutomationNodePrice();
             graph.nodes.forEach(n=>{const match=String(n.id).match(/_(\d+)$/);if(match)automationNodeCounter=Math.max(automationNodeCounter,Number(match[1]));});
-            document.getElementById("automation-add-node")?.addEventListener("click",()=>{const type=document.getElementById("automation-add-type").value,g=ensureAutomationGraph(),cost=AUTOMATION_NODE_COSTS[type]||0;if(!automationUnlocked()){alert("Automation unlocks at Core Rank III.");return;}if(!cost||game.cash<cost){alert("Not enough funds to purchase this automation node.");return;}game.cash-=cost;let id;do{id=type+"_"+(++automationNodeCounter);}while(g.nodes.some(n=>n.id===id));g.nodes.push({id:id,type:type,x:35+(g.nodes.length%4)*255,y:440+Math.floor(g.nodes.length/4)*120,share:50,threshold:10,reserve:100,tier:1,tierStart:3,tierEnd:5,efficiency:15});automationSelectedNode=id;automationSaveGraph();updateAutomationNodePrice();});
+            document.getElementById("automation-add-node")?.addEventListener("click",()=>{const type=document.getElementById("automation-add-type").value,g=ensureAutomationGraph(),cost=AUTOMATION_NODE_COSTS[type]||0;if(!automationUnlocked()){alert("Automation unlocks at Core Rank II.");return;}if(!cost||game.cash<cost){alert("Not enough funds to purchase this automation node.");return;}game.cash-=cost;let id;do{id=type+"_"+(++automationNodeCounter);}while(g.nodes.some(n=>n.id===id));g.nodes.push({id:id,type:type,x:35+(g.nodes.length%4)*255,y:440+Math.floor(g.nodes.length/4)*120,share:50,threshold:10,reserve:100,tier:1,tierStart:3,tierEnd:5,efficiency:15});automationSelectedNode=id;automationSaveGraph();updateAutomationNodePrice();});
             document.getElementById("automation-clear-link")?.addEventListener("click",()=>{automationPendingOutput=null;renderAutomationGraph();});
             document.getElementById("automation-reset-graph")?.addEventListener("click",()=>{if(confirm("Replace your current graph with the example layout?")){game.automation.graph=defaultAutomationGraph();automationPendingOutput=null;automationSaveGraph();}});
             renderAutomationGraph();
@@ -1660,14 +1725,15 @@ function setupPowerPlantControls(){
         }
 
         function calculatePendingPrestigeTokens() {
-            if (game.totalCashEarned < 100000) return 0;
-            return Math.floor(Math.pow(game.totalCashEarned / 100000, 0.25));
+            const earned=Number(game.runCashEarned ?? game.totalCashEarned)||0;
+            if (earned < 100000) return 0;
+            return Math.floor(Math.pow(earned / 100000, 0.25));
         }
 
         function performPrestigeReset() {
             const pending = calculatePendingPrestigeTokens();
             if (pending <= 0) {
-                alert("You need at least $100,000 in all-time earnings to gain Core Essence.");
+                alert("You need at least $100,000 in current-run earnings to gain Core Essence.");
                 return;
             }
 
@@ -1676,6 +1742,7 @@ function setupPowerPlantControls(){
                 game.totalPrestigeResets++;
                 const oldRank=getCoreRank();
                 game.totalCoreEssenceEarned=(game.totalCoreEssenceEarned||0)+pending;
+                game.runCashEarned=0;
 
                 // Reset standard stats
                 game.cash = 0;
@@ -1700,6 +1767,7 @@ function setupPowerPlantControls(){
         function addCash(amount) {
             game.cash += amount;
             game.totalCashEarned += amount;
+            game.runCashEarned = (Number(game.runCashEarned ?? 0) || 0) + amount;
         }
 
         /* --- UI RENDERING & LOGIC --- */
@@ -2164,6 +2232,7 @@ function setupPowerPlantControls(){
         function saveGame() {
             const saveData = {
                 totalCoreEssenceEarned: game.totalCoreEssenceEarned || 0,
+                runCashEarned: game.runCashEarned ?? game.totalCashEarned ?? 0,
                 cash: game.cash,
                 totalCashEarned: game.totalCashEarned,
                 depthMeters: game.depthMeters,
