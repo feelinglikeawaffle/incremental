@@ -1047,18 +1047,23 @@ ORE_TIERS.forEach((tier,index)=>{
             while(game.minerInstances.length<game.minersCount){
                 const idx=game.minerInstances.length,depthTier=Math.min(game.unlockedTier-1,Math.max(0,Number(game.minerDepths[idx])||0));
                 game.minerDepths[idx]=depthTier;
-                game.minerInstances.push({id:idx+1,depthTier,progress:0,phase:"scanning",currentRock:generateRock(depthTier)});
+                game.minerInstances.push({id:idx+1,depthTier,mode:"depth",progress:0,phase:"scanning",currentRock:generateRock(depthTier)});
             }
-            game.minerInstances.forEach((miner,idx)=>{miner.depthTier=Math.min(game.unlockedTier-1,Math.max(0,Number(game.minerDepths[idx]??miner.depthTier??0)||0));game.minerDepths[idx]=miner.depthTier;});
+            game.minerInstances.forEach((miner,idx)=>{miner.depthTier=Math.min(game.unlockedTier-1,Math.max(0,Number(game.minerDepths[idx]??miner.depthTier??0)||0));miner.mode=miner.mode==="fuel"?"fuel":"depth";game.minerDepths[idx]=miner.depthTier;});
         }
-        function generateRock(depthTier=0) {
-            const selectedTier=Math.max(0,Math.min(game.unlockedTier-1,Number(depthTier)||0));
-            const tierObj=ORE_TIERS[selectedTier],availableOres=[];
-            if(tierObj)tierObj.ores.forEach(ore=>{let adjustedWeight=ore.weight;if(ore.weight<20)adjustedWeight*=game.luckMultiplier;availableOres.push({ore,weight:adjustedWeight});});
+        function getUnlockedFuelOres() {
+            const fuelIds=new Set(Object.values(POWER_PLANT_TYPES).map(spec=>spec.fuel).filter(Boolean));
+            (game.powerPlants||[]).forEach(plant=>{if(plant.fuelOre)fuelIds.add(plant.fuelOre);});
+            return ORE_TIERS.filter(t=>t.tier<=game.unlockedTier).flatMap(t=>t.ores).filter(ore=>fuelIds.has(ore.id));
+        }
+        function generateRock(depthTier=0, mode="depth") {
+            const selectedTier=Math.max(0,Math.min(game.unlockedTier-1,Number(depthTier)||0)),availableOres=[];
+            const candidates=mode==="fuel"?getUnlockedFuelOres():(ORE_TIERS[selectedTier]?.ores||[]);
+            candidates.forEach(ore=>{let adjustedWeight=ore.weight;if(ore.weight<20)adjustedWeight*=game.luckMultiplier;availableOres.push({ore,weight:adjustedWeight});});
             let totalWeight=availableOres.reduce((sum,item)=>sum+item.weight,0);
             let random=Math.random()*totalWeight;
             for(let item of availableOres){if(random<item.weight)return item.ore;random-=item.weight;}
-            return tierObj?.ores?.[0]||ORE_TIERS[0].ores[0];
+            return candidates[0]||ORE_TIERS[selectedTier]?.ores?.[0]||ORE_TIERS[0].ores[0];
         }
 
         /* --- MINING TICK PROCESSOR --- */
@@ -1256,7 +1261,7 @@ function setupPowerPlantControls(){
                     // Completed full cycle
                     miner.progress = 0;
                     breakRock(miner.currentRock, idx);
-                    miner.currentRock = generateRock(miner.depthTier);
+                    miner.currentRock = generateRock(miner.depthTier,miner.mode);
                     currentPhase = 'scanning';
                     phaseProgress = 0;
                 }
@@ -1317,11 +1322,13 @@ function setupPowerPlantControls(){
 
         let autoSellAccumulator = 0;
         function autoSellTick(dt) {
-            if (!automationHasPath("miners","sell") || game.automation?.policy === "stockpile") return;
+            if (game.automation?.policy === "stockpile") return;
             autoSellAccumulator += dt;
             const interval=UPGRADE_DEFINITIONS.find(u=>u.id==="a_quick_sell").effect(game.upgrades["a_quick_sell"]||0);
             if(autoSellAccumulator>=interval){
                 autoSellAccumulator=0;const nodes=ensureAutomationGraph().nodes;
+                // Basic logistics hub operates without a configured graph; graph routing is optional.
+                if (!automationHasPath("miners","sell")) { sellAllInventory(true,true,1,null,[]); return; }
                 const vault=nodes.find(n=>n.type==="storage"&&automationHasPath("sorter",n.id));
                 const buffer=nodes.find(n=>n.type==="buffer"&&automationHasPath("sorter",n.id)&&automationHasPath(n.id,"sell"));
                 const splitter=nodes.find(n=>n.type==="splitter"&&automationHasPath("sorter",n.id)&&automationHasPath(n.id,"sell"));
@@ -1951,12 +1958,14 @@ function setupPowerPlantControls(){
                     const instance = game.minerInstances[i];
                     const depthOptions=ORE_TIERS.slice(0,game.unlockedTier).map((tier,index)=>`<option value="${index}" ${index===instance.depthTier?"selected":""}>Tier ${index+1}: ${tier.name}</option>`).join("");
                     const minerWatts=12*Math.pow(3.25,instance.depthTier||0);
+                    const fuelCount=getUnlockedFuelOres().length;
                     const depthEfficiency=Math.round((instance.depthTier||0)*3.5);
                     card.innerHTML = `
                         <div>
                             <strong>Auto-Miner Rig #${i + 1}</strong> [Status: OPERATIONAL]<br>
-                            <label>Assigned depth: <select data-miner-depth="${i}">${depthOptions}</select></label>
-                            <br><small>Depth efficiency: +${depthEfficiency}% mining speed</small>
+                            <label>Mining focus: <select data-miner-mode="${i}"><option value="depth" ${instance.mode!=="fuel"?"selected":""}>Assigned depth ores</option><option value="fuel" ${instance.mode==="fuel"?"selected":""} ${fuelCount?"":"disabled"}>Power fuel only (${fuelCount} types)</option></select></label>
+                            <br><label>Assigned depth: <select data-miner-depth="${i}" ${instance.mode==="fuel"?"disabled":""}>${depthOptions}</select></label>
+                            <br><small>${instance.mode==="fuel"?"Fuel focus: mines fuel ores from every unlocked depth.":"Depth efficiency: + "+depthEfficiency+"% mining speed"}</small>
                             <br><small>Power demand: ${formatNumber(minerWatts)} W</small>
                             <br>
                             Current Ore Target: <strong id="miner-rock-name-${i}">${instance.currentRock.name}</strong>
@@ -1979,7 +1988,8 @@ function setupPowerPlantControls(){
                 }
                 grid.appendChild(card);
             }
-            grid.querySelectorAll("[data-miner-depth]").forEach(select=>select.addEventListener("change",()=>{const idx=Number(select.dataset.minerDepth),tier=Math.max(0,Math.min(game.unlockedTier-1,Number(select.value)||0)),miner=game.minerInstances[idx];if(!miner)return;miner.depthTier=tier;game.minerDepths[idx]=tier;miner.progress=0;miner.currentRock=generateRock(tier);renderMinersGrid();saveGame();updateUIHUD();}));
+            grid.querySelectorAll("[data-miner-depth]").forEach(select=>select.addEventListener("change",()=>{const idx=Number(select.dataset.minerDepth),tier=Math.max(0,Math.min(game.unlockedTier-1,Number(select.value)||0)),miner=game.minerInstances[idx];if(!miner)return;miner.depthTier=tier;game.minerDepths[idx]=tier;miner.progress=0;miner.currentRock=generateRock(tier,miner.mode);renderMinersGrid();saveGame();updateUIHUD();}));
+            grid.querySelectorAll("[data-miner-mode]").forEach(select=>select.addEventListener("change",()=>{const idx=Number(select.dataset.minerMode),miner=game.minerInstances[idx];if(!miner)return;miner.mode=select.value==="fuel"&&getUnlockedFuelOres().length?"fuel":"depth";miner.progress=0;miner.currentRock=generateRock(miner.depthTier,miner.mode);renderMinersGrid();saveGame();updateUIHUD();}));
         }
 
         function purchaseMiner(cost) {
