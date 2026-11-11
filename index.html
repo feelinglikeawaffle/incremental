@@ -886,7 +886,7 @@ ORE_TIERS.forEach((tier,index)=>{
             { id: "mk_event_forecast", cat: "market", name: "Commodity Forecast Desk", desc: "Market events last 15% longer per level.", baseCost: 3500, costMult: 2.1, maxLvl: 20, effect: (lvl) => 1 + lvl * 0.15 },
 
             // AUTOMATION CATEGORY
-            { id: "a_autosell", cat: "automation", name: "Automated Logistics Hub", desc: "Unlocks global Auto-Seller switch for continuous inventory liquidation.", baseCost: 500, costMult: 1.0, maxLvl: 1, effect: (lvl) => lvl > 0 },
+            { id: "a_autosell", cat: "automation", name: "Automated Logistics Hub", desc: "Unlocks the basic Auto-Seller switch for continuous inventory liquidation.", baseCost: 50, costMult: 1.0, maxLvl: 1, effect: (lvl) => lvl > 0 },
             { id: "a_contract_auto", cat: "automation", name: "Automated Contract Fulfillment", desc: "Automatically submits stored inventory to active bidding contracts when target is met.", baseCost: 50000, costMult: 1.0, maxLvl: 1, effect: (lvl) => lvl > 0 },
             { id: "a_quick_sell", cat: "automation", name: "Rapid Liquidation Relay", desc: "Runs automated inventory sales more frequently.", baseCost: 12000, costMult: 2.0, maxLvl: 5, effect: (lvl) => Math.max(0.2, 1 - lvl * 0.16) },
             { id: "a_auto_bonus", cat: "automation", name: "Premium Sales Routing", desc: "Automated sales receive +4% value per level.", baseCost: 18000, costMult: 2.2, maxLvl: 20, effect: (lvl) => 1 + lvl * 0.04 },
@@ -1211,12 +1211,15 @@ function setupPowerPlantControls(){
             const contractPath=(game.upgrades["a_contract_auto"]||0)>0&&automationHasPath("miners","contract")&&game.automation?.policy==="balanced";
             const activeNodes=g.nodes.filter(n=>n.type!=="miners"&&connected(n.id)&&((n.type!=="sell")||game.autoSellEnabled));
             const processPower=activeNodes.filter(n=>["crusher","smelter","refinery","resonator"].includes(n.type)).reduce((sum,n)=>sum+({crusher:2,smelter:3,refinery:5,resonator:4}[n.type]||0),0);
+            const autoBonusLevel=game.upgrades["a_auto_bonus"]||0,sorterLevel=game.upgrades["a_smart_sorter"]||0;
+            const automationMultiplier=(1+autoBonusLevel*.04)*(1+sorterLevel*.10);
+            const multiplierPower=Math.max(0,automationMultiplier-1)*18;
             const depthPower=tierIndex=>12*Math.pow(3.25,Math.max(0,tierIndex));
             const minerDemand=(game.minerInstances||[]).slice(0,game.minersCount).reduce((sum,m)=>sum+depthPower(m.depthTier||0),0);
             const deepestMiner=Math.max(0,...(game.minerInstances||[]).slice(0,game.minersCount).map(m=>m.depthTier||0));
             const automationDepthFactor=Math.pow(2.4,deepestMiner);
             const contractTier=Math.max(0,ORE_TIERS.findIndex(t=>t.ores.some(o=>o.id===game.activeContract?.oreId)));
-            const demandByType={miners:minerDemand,automation:autoPath?(2+activeNodes.length+processPower)*automationDepthFactor:0,contracts:contractPath?2*Math.pow(2.2,contractTier):0},efficiency=1+Math.min(.25,(game.upgrades["p_stabilizer"]||0)*.0125);
+            const demandByType={miners:minerDemand,automation:autoPath?(2+activeNodes.length+processPower+multiplierPower)*automationDepthFactor:0,contracts:contractPath?2*Math.pow(2.2,contractTier):0},efficiency=1+Math.min(.25,(game.upgrades["p_stabilizer"]||0)*.0125);
             let available=generated;const ratios={miners:0,automation:0,contracts:0},order=game.powerGrid?.priority==="automation"?["automation","miners","contracts"]:game.powerGrid?.priority==="contracts"?["contracts","miners","automation"]:["miners","automation","contracts"];
             order.forEach(key=>{const need=demandByType[key];if(!need){ratios[key]=1;return;}if(!powerConsumerConnected(key)){ratios[key]=0;return;}const supplied=Math.min(need,available*efficiency);ratios[key]=Math.max(0,Math.min(1,supplied/need));available=Math.max(0,available-supplied/efficiency);});
             game.powerRatios=ratios;const demand=demandByType.miners+demandByType.automation+demandByType.contracts;
@@ -1352,7 +1355,7 @@ function setupPowerPlantControls(){
             blacklist:{name:"Ore Blacklist",inputs:["Ore input"],outputs:["Allowed ore"],desc:"Blocks the selected ore; can also exclude fuel from power plants."}
         };
         function defaultAutomationGraph(){return {nodes:[{id:"miners",type:"miners",x:35,y:100}],links:[]};}
-        const AUTOMATION_NODE_COSTS={sorter:150000,filter:300000,splitter:450000,buffer:400000,storage:650000,market:800000,sell:550000,contract:1200000,crusher:2000000,smelter:5000000,refinery:12000000,resonator:20000000,whitelist:900000,blacklist:900000};
+        const AUTOMATION_NODE_COSTS={sorter:12000,filter:300000,splitter:450000,buffer:400000,storage:650000,market:800000,sell:8000,contract:1200000,crusher:2000000,smelter:5000000,refinery:12000000,resonator:20000000,whitelist:900000,blacklist:900000};
         function automationUnlocked(){return getCoreRank()>=2;}
         function updateAutomationUnlockUI(){const tab=document.getElementById("automation-nav-tab");if(tab)tab.classList.toggle("hidden",!automationUnlocked());}
         function updateAutomationNodePrice(){const type=document.getElementById("automation-add-type")?.value,cost=AUTOMATION_NODE_COSTS[type]||0,price=document.getElementById("automation-node-price"),button=document.getElementById("automation-add-node");if(price)price.textContent=cost?"Cost: "+formatMoney(cost):"";if(button)button.disabled=!automationUnlocked()||game.cash<cost;}
@@ -1454,7 +1457,7 @@ function setupPowerPlantControls(){
                 el.addEventListener("click",e=>{
                     const pin=e.target.closest("[data-pin]");
                     if(pin){e.stopPropagation();const index=Number(pin.dataset.index);if(pin.dataset.pin==="out"){automationPendingOutput={node:node.id,index:index};renderAutomationGraph();}
-                    else if(automationPendingOutput&&automationPendingOutput.node!==node.id){const exists=g.links.some(l=>l.to===node.id&&l.input===index);if(!exists){g.links.push({from:automationPendingOutput.node,to:node.id,out:automationPendingOutput.index,input:index});}automationPendingOutput=null;automationSaveGraph();}
+                    else if(automationPendingOutput&&automationPendingOutput.node!==node.id){const exists=g.links.some(l=>l.to===node.id&&l.input===index);if(!exists){const advanced=["filter","splitter","buffer","storage","market","contract","crusher","smelter","refinery","resonator","whitelist","blacklist"].includes(node.type);const source=automationNode(automationPendingOutput.node);if(advanced&&source?.type==="miners"){alert("This block needs a processing stage first. Connect Miner Output → Ore Sorter, then route the sorted stream into "+AUTOMATION_NODE_TYPES[node.type].name+".");automationPendingOutput=null;renderAutomationGraph();return;}g.links.push({from:automationPendingOutput.node,to:node.id,out:automationPendingOutput.index,input:index});}automationPendingOutput=null;automationSaveGraph();}
                     else{automationPendingOutput=null;renderAutomationGraph();}return;}
                     if(e.target.closest("[data-delete-node]")){g.links=g.links.filter(l=>l.from!==node.id&&l.to!==node.id);g.nodes=g.nodes.filter(n=>n.id!==node.id);automationSelectedNode=null;automationSaveGraph();return;}
                     if(e.target.matches("[data-config]"))return;automationSelectedNode=node.id;renderAutomationInspector(node);renderAutomationGraph();
@@ -1709,6 +1712,7 @@ function setupPowerPlantControls(){
                 game.depthMeters = nextTierObj.depthMeters;
                 
                 renderDepthTab();
+                renderMinersGrid();
                 updateUIHUD();
                 logDrop(`SUCCESS! Drilled down to Depth Strata Tier ${game.unlockedTier}: ${nextTierObj.name}`, "#0000b3");
             }
