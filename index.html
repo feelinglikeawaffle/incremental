@@ -860,7 +860,8 @@ ORE_TIERS.forEach((tier,index)=>{
             prestigePerks: {},
 
             // Active Miner Instances runtime timers
-            minerInstances: []
+            minerInstances: [],
+            minerDepths: []
         };
 
         /* --- UPGRADES DEFINITIONS --- */
@@ -1041,41 +1042,23 @@ ORE_TIERS.forEach((tier,index)=>{
         }
 
         function syncMinerInstances() {
-            while (game.minerInstances.length < game.minersCount) {
-                game.minerInstances.push({
-                    id: game.minerInstances.length + 1,
-                    progress: 0,
-                    phase: 'scanning', // phases: 'scanning', 'mining', 'polishing'
-                    currentRock: generateRock()
-                });
+            if(!Array.isArray(game.minerDepths))game.minerDepths=[];
+            while(game.minerDepths.length<game.minersCount)game.minerDepths.push(Math.max(0,game.unlockedTier-1));
+            while(game.minerInstances.length<game.minersCount){
+                const idx=game.minerInstances.length,depthTier=Math.min(game.unlockedTier-1,Math.max(0,Number(game.minerDepths[idx])||0));
+                game.minerDepths[idx]=depthTier;
+                game.minerInstances.push({id:idx+1,depthTier,progress:0,phase:"scanning",currentRock:generateRock(depthTier)});
             }
+            game.minerInstances.forEach((miner,idx)=>{miner.depthTier=Math.min(game.unlockedTier-1,Math.max(0,Number(game.minerDepths[idx]??miner.depthTier??0)||0));game.minerDepths[idx]=miner.depthTier;});
         }
-
-        function generateRock() {
-            let availableOres = [];
-            
-            for (let t = 0; t < game.unlockedTier; t++) {
-                const tierObj = ORE_TIERS[t];
-                tierObj.ores.forEach(ore => {
-                    let adjustedWeight = ore.weight;
-                    if (ore.weight < 20) {
-                        adjustedWeight *= game.luckMultiplier;
-                    }
-                    availableOres.push({ ore, weight: adjustedWeight });
-                });
-            }
-
-            let totalWeight = availableOres.reduce((sum, item) => sum + item.weight, 0);
-            let random = Math.random() * totalWeight;
-
-            for (let item of availableOres) {
-                if (random < item.weight) {
-                    return item.ore;
-                }
-                random -= item.weight;
-            }
-
-            return ORE_TIERS[0].ores[0];
+        function generateRock(depthTier=0) {
+            const selectedTier=Math.max(0,Math.min(game.unlockedTier-1,Number(depthTier)||0));
+            const tierObj=ORE_TIERS[selectedTier],availableOres=[];
+            if(tierObj)tierObj.ores.forEach(ore=>{let adjustedWeight=ore.weight;if(ore.weight<20)adjustedWeight*=game.luckMultiplier;availableOres.push({ore,weight:adjustedWeight});});
+            let totalWeight=availableOres.reduce((sum,item)=>sum+item.weight,0);
+            let random=Math.random()*totalWeight;
+            for(let item of availableOres){if(random<item.weight)return item.ore;random-=item.weight;}
+            return tierObj?.ores?.[0]||ORE_TIERS[0].ores[0];
         }
 
         /* --- MINING TICK PROCESSOR --- */
@@ -1228,7 +1211,12 @@ function setupPowerPlantControls(){
             const contractPath=(game.upgrades["a_contract_auto"]||0)>0&&automationHasPath("miners","contract")&&game.automation?.policy==="balanced";
             const activeNodes=g.nodes.filter(n=>n.type!=="miners"&&connected(n.id)&&((n.type!=="sell")||game.autoSellEnabled));
             const processPower=activeNodes.filter(n=>["crusher","smelter","refinery","resonator"].includes(n.type)).reduce((sum,n)=>sum+({crusher:2,smelter:3,refinery:5,resonator:4}[n.type]||0),0);
-            const demandByType={miners:game.minersCount*6,automation:autoPath?2+activeNodes.length+processPower:0,contracts:contractPath?2:0},efficiency=1+Math.min(.25,(game.upgrades["p_stabilizer"]||0)*.0125);
+            const depthPower=tierIndex=>12*Math.pow(3.25,Math.max(0,tierIndex));
+            const minerDemand=(game.minerInstances||[]).slice(0,game.minersCount).reduce((sum,m)=>sum+depthPower(m.depthTier||0),0);
+            const deepestMiner=Math.max(0,...(game.minerInstances||[]).slice(0,game.minersCount).map(m=>m.depthTier||0));
+            const automationDepthFactor=Math.pow(2.4,deepestMiner);
+            const contractTier=Math.max(0,ORE_TIERS.findIndex(t=>t.ores.some(o=>o.id===game.activeContract?.oreId)));
+            const demandByType={miners:minerDemand,automation:autoPath?(2+activeNodes.length+processPower)*automationDepthFactor:0,contracts:contractPath?2*Math.pow(2.2,contractTier):0},efficiency=1+Math.min(.25,(game.upgrades["p_stabilizer"]||0)*.0125);
             let available=generated;const ratios={miners:0,automation:0,contracts:0},order=game.powerGrid?.priority==="automation"?["automation","miners","contracts"]:game.powerGrid?.priority==="contracts"?["contracts","miners","automation"]:["miners","automation","contracts"];
             order.forEach(key=>{const need=demandByType[key];if(!need){ratios[key]=1;return;}if(!powerConsumerConnected(key)){ratios[key]=0;return;}const supplied=Math.min(need,available*efficiency);ratios[key]=Math.max(0,Math.min(1,supplied/need));available=Math.max(0,available-supplied/efficiency);});
             game.powerRatios=ratios;const demand=demandByType.miners+demandByType.automation+demandByType.contracts;
@@ -1263,7 +1251,7 @@ function setupPowerPlantControls(){
                     // Completed full cycle
                     miner.progress = 0;
                     breakRock(miner.currentRock, idx);
-                    miner.currentRock = generateRock();
+                    miner.currentRock = generateRock(miner.depthTier);
                     currentPhase = 'scanning';
                     phaseProgress = 0;
                 }
@@ -1752,6 +1740,7 @@ function setupPowerPlantControls(){
                 game.inventory = {};
                 game.upgrades = {};
                 game.minerInstances = [];
+                game.minerDepths = [0];
 
                 initData();
                 renderMinersGrid();
@@ -1954,9 +1943,13 @@ function setupPowerPlantControls(){
 
                 if (isActive) {
                     const instance = game.minerInstances[i];
+                    const depthOptions=ORE_TIERS.slice(0,game.unlockedTier).map((tier,index)=>`<option value="${index}" ${index===instance.depthTier?"selected":""}>Tier ${index+1}: ${tier.name}</option>`).join("");
+                    const minerWatts=12*Math.pow(3.25,instance.depthTier||0);
                     card.innerHTML = `
                         <div>
-                            <strong>Auto-Miner Rig #${i + 1}</strong> [Status: OPERATIONAL]
+                            <strong>Auto-Miner Rig #${i + 1}</strong> [Status: OPERATIONAL]<br>
+                            <label>Assigned depth: <select data-miner-depth="${i}">${depthOptions}</select></label>
+                            <br><small>Power demand: ${formatNumber(minerWatts)} W</small>
                             <br>
                             Current Ore Target: <strong id="miner-rock-name-${i}">${instance.currentRock.name}</strong>
                             <br>
@@ -1978,12 +1971,14 @@ function setupPowerPlantControls(){
                 }
                 grid.appendChild(card);
             }
+            grid.querySelectorAll("[data-miner-depth]").forEach(select=>select.addEventListener("change",()=>{const idx=Number(select.dataset.minerDepth),tier=Math.max(0,Math.min(game.unlockedTier-1,Number(select.value)||0)),miner=game.minerInstances[idx];if(!miner)return;miner.depthTier=tier;game.minerDepths[idx]=tier;miner.progress=0;miner.currentRock=generateRock(tier);renderMinersGrid();saveGame();updateUIHUD();}));
         }
 
         function purchaseMiner(cost) {
             if (game.cash >= cost && game.minersCount < game.minerMaxSlots) {
                 game.cash -= cost;
                 game.minersCount++;
+                game.minerDepths[game.minersCount-1]=Math.max(0,game.unlockedTier-1);
                 syncMinerInstances();
                 renderMinersGrid();
                 updateUIHUD();
@@ -2240,6 +2235,7 @@ function setupPowerPlantControls(){
                 totalRocksExcavated: game.totalRocksExcavated,
                 totalOresSold: game.totalOresSold,
                 minersCount: game.minersCount,
+                minerDepths: game.minerInstances.slice(0,game.minersCount).map(m=>m.depthTier||0),
                 autoSellEnabled: game.autoSellEnabled,
                 automation: game.automation,
                 powerGrid: game.powerGrid,
@@ -2268,7 +2264,9 @@ function setupPowerPlantControls(){
                 ensureCoreRanks();
                 if (!game.automation) game.automation = {};
                 if (!game.automation.graph) game.automation.graph = defaultAutomationGraph();
+                if(!Array.isArray(game.minerDepths))game.minerDepths=Array.isArray(parsed.minerDepths)?parsed.minerDepths:Array(game.minersCount||1).fill(Math.max(0,(game.unlockedTier||1)-1));
                 if (!game.powerGrid) game.powerGrid = { priority:"miners" }; ensurePowerWiring();
+                game.minerInstances=[];syncMinerInstances();
                 if (!Array.isArray(game.powerPlants)) game.powerPlants=[{id:1,type:"solar",name:"Solar Array",level:1,active:true,fuelPolicy:"whitelist",fuelOre:"coal"}];
                 game.nextPowerPlantId=game.nextPowerPlantId||Math.max(0,...game.powerPlants.map(p=>p.id||0))+1;
                 recalculateStats();
